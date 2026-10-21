@@ -17,11 +17,23 @@ asar: true
 
 win:
   icon: build/icon.png
+  # The build ships unsigned: skip Authenticode verification of downloaded
+  # updates (electron-updater would reject an unsigned installer otherwise).
+  verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch:
         - x64
   artifactName: DroidBridge-Setup-${version}-${arch}.${ext}
+
+# GitHub Releases is the update feed: electron-builder embeds app-update.yml
+# in the packaged app and uploads installer + blockmap + latest.yml.
+# releaseType: release (not the draft default) so installed clients can fetch it.
+publish:
+  - provider: github
+    owner: Abdullah-584
+    repo: droidbridge
+    releaseType: release
 
 nsis:
   oneClick: false

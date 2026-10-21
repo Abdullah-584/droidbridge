@@ -6,8 +6,10 @@ import {
   findScrcpy,
   findVSCode,
   findWingetScrcpy,
+  parseRegQueryValue,
   whichSync,
   type FileProbe,
+  type RegReader,
 } from '../../src/main/adb/locate';
 
 function probeFor(files: string[]): FileProbe {
@@ -16,6 +18,10 @@ function probeFor(files: string[]): FileProbe {
 }
 
 const sep = path.sep;
+/** Platform-correct adb binary name so these tests run on Windows and macOS CI. */
+const ADB = process.platform === 'win32' ? 'adb.exe' : 'adb';
+/** Hermetic default: no registry data unless a test injects a fake reader. */
+const noReg: RegReader = () => null;
 
 describe('whichSync', () => {
   it('finds the first matching candidate on PATH', () => {
@@ -31,9 +37,9 @@ describe('whichSync', () => {
 
 describe('findAdb', () => {
   it('prefers the explicit override', () => {
-    const env = { DROIDBRIDGE_ADB_PATH: `C${sep}custom${sep}adb.exe`, PATH: '' };
+    const env = { DROIDBRIDGE_ADB_PATH: `C${sep}custom${sep}${ADB}`, PATH: '' };
     const probe = probeOf(env.DROIDBRIDGE_ADB_PATH);
-    expect(findAdb(env, probe)).toEqual({ path: env.DROIDBRIDGE_ADB_PATH, source: 'env' });
+    expect(findAdb(env, probe, noReg)).toEqual({ path: env.DROIDBRIDGE_ADB_PATH, source: 'env' });
   });
 
   it('uses ANDROID_HOME platform-tools before PATH', () => {
@@ -42,24 +48,113 @@ describe('findAdb', () => {
       PATH: `C${sep}pathbin`,
     };
     const probe = probeOf(
-      `${env.ANDROID_HOME}${sep}platform-tools${sep}adb.exe`,
-      `${env.PATH}${sep}adb.exe`,
+      `${env.ANDROID_HOME}${sep}platform-tools${sep}${ADB}`,
+      `${env.PATH}${sep}${ADB}`,
     );
-    expect(findAdb(env, probe)).toEqual({
-      path: `${env.ANDROID_HOME}${sep}platform-tools${sep}adb.exe`,
+    expect(findAdb(env, probe, noReg)).toEqual({
+      path: `${env.ANDROID_HOME}${sep}platform-tools${sep}${ADB}`,
       source: 'env',
     });
   });
 
   it('falls back to PATH then default locations', () => {
     const env = { PATH: `C${sep}pathbin`, LOCALAPPDATA: `C${sep}users${sep}me${sep}AppData${sep}Local` };
-    const fromPath = probeOf(`${env.PATH}${sep}adb.exe`);
-    expect(findAdb(env, fromPath)).toEqual({ path: `${env.PATH}${sep}adb.exe`, source: 'path' });
+    const fromPath = probeOf(`${env.PATH}${sep}${ADB}`);
+    expect(findAdb(env, fromPath, noReg)).toEqual({ path: `${env.PATH}${sep}${ADB}`, source: 'path' });
 
-    const defaultPath = `${env.LOCALAPPDATA}${sep}Android${sep}Sdk${sep}platform-tools${sep}adb.exe`;
-    expect(findAdb(env, probeOf(defaultPath))).toEqual({ path: defaultPath, source: 'default-location' });
+    const defaultPath = `${env.LOCALAPPDATA}${sep}Android${sep}Sdk${sep}platform-tools${sep}${ADB}`;
+    expect(findAdb(env, probeOf(defaultPath), noReg)).toEqual({ path: defaultPath, source: 'default-location' });
 
-    expect(findAdb(env, probeOf())).toEqual({ path: null, source: 'not-found' });
+    expect(findAdb(env, probeOf(), noReg)).toEqual({ path: null, source: 'not-found' });
+  });
+});
+
+describe('findAdb registry lookup', () => {
+  const sdk = `C${sep}Users${sep}me${sep}AppData${sep}Local${sep}Android${sep}Sdk`;
+  const registeredAdb = `${sdk}${sep}platform-tools${sep}${ADB}`;
+
+  it('prefers the registry over ANDROID_HOME and PATH', () => {
+    const env = { ANDROID_HOME: `C${sep}other-sdk`, PATH: `C${sep}pathbin` };
+    // Both the registry location AND the env/PATH locations exist in the probe;
+    // the registry must still win.
+    const probe = probeOf(
+      registeredAdb,
+      `${env.ANDROID_HOME}${sep}platform-tools${sep}${ADB}`,
+      `${env.PATH}${sep}${ADB}`,
+    );
+    const readReg: RegReader = (key) => (key.includes('HKCU') ? sdk : null);
+    expect(findAdb(env, probe, readReg)).toEqual({ path: registeredAdb, source: 'registry' });
+  });
+
+  it('consults keys in order and stops at the first hit', () => {
+    const queried: string[] = [];
+    const readReg: RegReader = (key) => {
+      queried.push(key);
+      return key.startsWith('HKLM\\SOFTWARE') && !key.includes('WOW6432Node') ? sdk : null;
+    };
+    const found = findAdb({ PATH: '' }, probeOf(registeredAdb), readReg);
+    expect(found).toEqual({ path: registeredAdb, source: 'registry' });
+    // HKCU first, then HKLM; the 32-bit view is only consulted after a miss.
+    expect(queried[0]).toContain('HKCU');
+    expect(queried[1]).toContain('HKLM');
+    expect(queried.some((k) => k.includes('WOW6432Node'))).toBe(false);
+  });
+
+  it('consults the 32-bit registry view when the 64-bit keys miss', () => {
+    const queried: string[] = [];
+    const readReg: RegReader = (key) => {
+      queried.push(key);
+      return key.includes('WOW6432Node') ? sdk : null;
+    };
+    expect(findAdb({ PATH: '' }, probeOf(registeredAdb), readReg)).toEqual({
+      path: registeredAdb,
+      source: 'registry',
+    });
+    expect(queried.some((k) => k.includes('WOW6432Node'))).toBe(true);
+  });
+
+  it('accepts a Path value that points directly at platform-tools', () => {
+    const platformTools = `C${sep}sdk${sep}platform-tools`;
+    const direct = `${platformTools}${sep}${ADB}`;
+    const readReg: RegReader = () => platformTools;
+    expect(findAdb({ PATH: '' }, probeOf(direct), readReg)).toEqual({ path: direct, source: 'registry' });
+  });
+
+  it('falls through to env/PATH when the registry path has no adb', () => {
+    const env = { PATH: `C${sep}pathbin` };
+    // Registry returns a directory that exists, but contains no adb binary.
+    expect(findAdb(env, probeOf(`${env.PATH}${sep}${ADB}`), () => `C${sep}empty-sdk`)).toEqual({
+      path: `${env.PATH}${sep}${ADB}`,
+      source: 'path',
+    });
+  });
+
+  it('reports not-found when the registry has no SDK key at all', () => {
+    expect(findAdb({ PATH: '' }, probeOf(), () => null)).toEqual({ path: null, source: 'not-found' });
+  });
+});
+
+describe('parseRegQueryValue', () => {
+  it('extracts a REG_SZ value from real `reg query` output', () => {
+    const output = [
+      '',
+      'HKEY_CURRENT_USER\\Software\\Android SDK Tools',
+      '    Path    REG_SZ    C:\\Users\\me\\AppData\\Local\\Android\\Sdk',
+      '',
+    ].join('\r\n');
+    expect(parseRegQueryValue(output, 'Path')).toBe('C:\\Users\\me\\AppData\\Local\\Android\\Sdk');
+  });
+
+  it('handles REG_EXPAND_SZ and ignores other value names', () => {
+    const output =
+      'HKEY_LOCAL_MACHINE\\SOFTWARE\\Android SDK Tools\r\n    Path    REG_EXPAND_SZ    %LOCALAPPDATA%\\Android\\Sdk\r\n    Other    REG_DWORD    0x1\r\n';
+    expect(parseRegQueryValue(output, 'Path')).toBe('%LOCALAPPDATA%\\Android\\Sdk');
+    expect(parseRegQueryValue(output, 'Missing')).toBeNull();
+  });
+
+  it('returns null for empty or unrelated output', () => {
+    expect(parseRegQueryValue('', 'Path')).toBeNull();
+    expect(parseRegQueryValue('ERROR: The system was unable to find the specified registry key or value.', 'Path')).toBeNull();
   });
 });
 
@@ -72,7 +167,7 @@ describe('findFlutter / findScrcpy / findVSCode', () => {
 
   it('finds scrcpy on PATH', () => {
     const env = { PATH: `C${sep}tools` };
-    const exe = `${env.PATH}${sep}scrcpy.exe`;
+    const exe = `${env.PATH}${sep}${process.platform === 'win32' ? 'scrcpy.exe' : 'scrcpy'}`;
     expect(findScrcpy(env, probeOf(exe))).toEqual({ path: exe, source: 'path' });
   });
 

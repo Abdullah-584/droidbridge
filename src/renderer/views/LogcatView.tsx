@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AdbDevice, LogcatLine, LogLevel } from '../../shared/types';
-import { LOGCAT_BUFFERS, LOGCAT_LEVELS } from '../../shared/types';
+import type { AdbDevice, LogcatExportFormat, LogLevel } from '../../shared/types';
+import { LOGCAT_BUFFERS, LOGCAT_EXPORT_FORMATS, LOGCAT_LEVELS } from '../../shared/types';
 import { Button, Card, EmptyState, Field, inputClass } from '../components/ui';
 import { IconExport, IconPause, IconPlay, IconSearch, IconStop, IconTerminal, IconTrash } from '../components/icons';
 import { filterLogLines, logLevelClass } from '../lib/format';
@@ -23,6 +23,7 @@ export function LogcatView({ devices, initialSerial }: Props) {
   const [minLevel, setMinLevel] = useState<LogLevel>('verbose');
   const [search, setSearch] = useState('');
   const [follow, setFollow] = useState(true);
+  const [exportFormat, setExportFormat] = useState<LogcatExportFormat>('log');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -92,8 +93,8 @@ export function LogcatView({ devices, initialSerial }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const path = await logcat.exportLines(filtered.map((line: LogcatLine) => line.raw));
-      setNotice(`Exported ${filtered.length} lines to ${path}`);
+      const { path, count } = await logcat.exportLines(filtered, exportFormat);
+      setNotice(`Exported ${count} lines to ${path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -123,6 +124,19 @@ export function LogcatView({ devices, initialSerial }: Props) {
               <IconTrash size={13} />
               Clear device buffer
             </Button>
+            <select
+              className={`${inputClass} w-auto py-1.5 text-xs`}
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as LogcatExportFormat)}
+              aria-label="Export format"
+              disabled={busy}
+            >
+              {LOGCAT_EXPORT_FORMATS.map((format) => (
+                <option key={format} value={format}>
+                  .{format}
+                </option>
+              ))}
+            </select>
             <Button size="sm" disabled={filtered.length === 0} loading={busy} onClick={() => void exportVisible()}>
               <IconExport size={13} />
               Export

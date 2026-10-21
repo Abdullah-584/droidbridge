@@ -28,9 +28,10 @@ export const INVOKE_CHANNELS = [
   'dialogs:pick-folder',
   'scrcpy:start',
   'scrcpy:stop',
+  'update:install',
 ] as const;
 
-export const EVENT_CHANNELS = ['logcat:lines', 'logcat:exit', 'scrcpy:exit'] as const;
+export const EVENT_CHANNELS = ['logcat:lines', 'logcat:exit', 'scrcpy:exit', 'update:status'] as const;
 
 /** Prefix used by the preload bridge for its typed API namespace. */
 export const PRELOAD_BRIDGE_NAME = 'droidbridge';

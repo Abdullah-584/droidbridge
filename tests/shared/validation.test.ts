@@ -3,6 +3,7 @@ import {
   ValidationError,
   assertExternalUrl,
   assertHost,
+  assertLogcatExport,
   assertLogcatOptions,
   assertPairCode,
   assertPort,
@@ -13,6 +14,7 @@ import {
   isValidIpv4,
   isValidHost,
 } from '../../src/shared/validation';
+import type { LogcatLine } from '../../src/shared/types';
 
 describe('assertSerial', () => {
   it('accepts USB serials, emulator ids and tcp endpoints', () => {
@@ -142,4 +144,48 @@ describe('isValidHost', () => {
     expect(isValidHost('192.168.1.1\n')).toBe(false);
     expect(isValidHost('host\u0007')).toBe(false);
   });
+});
+
+describe('assertLogcatExport', () => {
+  const line: LogcatLine = {
+    seq: 1,
+    raw: '10-18 22:57:33.123  1234  5678 I Tag: hello',
+    time: '10-18 22:57:33.123',
+    pid: 1234,
+    tid: 5678,
+    level: 'info',
+    tag: 'Tag',
+    message: 'hello',
+  };
+
+  it('accepts a well-formed payload and normalizes it', () => {
+    expect(assertLogcatExport({ format: 'csv', lines: [line] })).toEqual({ format: 'csv', lines: [line] });
+    expect(assertLogcatExport({ format: 'log', lines: [] }).lines).toEqual([]);
+    expect(assertLogcatExport({ format: 'json', lines: [{ ...line, message: null }] }).format).toBe('json');
+  });
+
+  it('rejects unknown formats', () => {
+    expect(() => assertLogcatExport({ format: 'pdf', lines: [] })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ lines: [] })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ format: 42, lines: [] })).toThrow(ValidationError);
+  });
+
+  it('rejects malformed line records', () => {
+    expect(() => assertLogcatExport({ format: 'log', lines: 'not-an-array' })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ format: 'log', lines: ['raw string'] })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ format: 'log', lines: [{ ...line, seq: 'one' }] })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ format: 'log', lines: [{ ...line, pid: 1.5 }] })).toThrow(ValidationError);
+    expect(() => assertLogcatExport({ format: 'log', lines: [{ ...line, level: 7 }] })).toThrow(ValidationError);
+  });
+
+  it('bounds per-line size and total payload', () => {
+    expect(() => assertLogcatExport({ format: 'log', lines: [{ ...line, raw: 'x'.repeat(8193) }] })).toThrow(
+      ValidationError,
+    );
+    expect(() => assertLogcatExport({ format: 'log', lines: [{ ...line, message: 'x'.repeat(8193) }] })).toThrow(
+      ValidationError,
+    );
+    const many = Array.from({ length: 500_001 }, () => line);
+    expect(() => assertLogcatExport({ format: 'log', lines: many })).toThrow(ValidationError);
+  }, 30_000);
 });

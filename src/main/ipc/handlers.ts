@@ -2,7 +2,7 @@ import {
   assertDialogTitle,
   assertExternalUrl,
   assertHost,
-  assertLogLineBatch,
+  assertLogcatExport,
   assertLogcatOptions,
   assertPairCode,
   assertPort,
@@ -24,7 +24,7 @@ import {
   runFlutterDoctor,
   runFlutterPubGet,
 } from '../services/tools';
-import { exportLogLines } from '../services/exporter';
+import { exportLogcat } from '../services/exporter';
 import type { HandlerSpecs } from './registry';
 import type { BrowserWindow } from 'electron';
 
@@ -36,6 +36,8 @@ export interface HandlerDeps {
   getWindow: () => BrowserWindow | undefined;
   openExternal: (url: string) => void;
   pickFolder: (title: string) => Promise<string | null>;
+  /** Applies a downloaded update (quit → installer → relaunch). */
+  installUpdate: () => void;
 }
 
 function asRecord(raw: unknown): Record<string, unknown> {
@@ -141,15 +143,8 @@ export function createHandlerSpecs(deps: HandlerDeps): HandlerSpecs {
       handle: () => ({ sessions: deps.logcat.sessions_() }),
     },
     'logcat:export': {
-      validate: (raw) => {
-        const rec = asRecord(raw);
-        return { sessionId: assertSessionId(rec.sessionId), lines: assertLogLineBatch(rec.lines) };
-      },
-      handle: async ({ lines }) => {
-        const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
-        const path = await exportLogLines(`logcat-${stamp}.log`, lines, deps.getWindow());
-        return { path };
-      },
+      validate: (raw) => assertLogcatExport(raw),
+      handle: async ({ format, lines }) => exportLogcat(format, lines, deps.getWindow()),
     },
     'flutter:doctor': {
       validate: noArgs,
@@ -185,6 +180,13 @@ export function createHandlerSpecs(deps: HandlerDeps): HandlerSpecs {
       validate: (raw) => ({ sessionId: assertSessionId(asRecord(raw).sessionId) }),
       handle: ({ sessionId }) => {
         deps.scrcpy.stop(sessionId);
+        return null;
+      },
+    },
+    'update:install': {
+      validate: noArgs,
+      handle: () => {
+        deps.installUpdate();
         return null;
       },
     },

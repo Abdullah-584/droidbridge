@@ -1,0 +1,77 @@
+name: Release
+
+# Two ways to cut a release:
+#   1. Tag push:   npm version patch && git push --follow-tags
+#   2. One click:  Actions → Release → Run workflow (bumps patch itself)
+# Both paths run the full quality gate, build the NSIS installer and publish
+# it to GitHub Releases with the update manifest (latest.yml + blockmap) that
+# installed clients poll for.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Creating/uploading a release needs write access for the default token.
+permissions:
+  contents: write
+
+# One release at a time; never cancel a half-uploaded release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Bump patch version (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          npm version patch --no-git-tag-version
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "release v$(node -p "require('./package.json').version")"
+          git push
+
+      # The live adb integration tests require a real adb on PATH.
+      - name: Install Android platform-tools (for live tests)
+        run: |
+          Invoke-WebRequest -Uri https://dl.google.com/android/repository/platform-tools-latest-windows.zip -OutFile platform-tools.zip
+          Expand-Archive platform-tools.zip -DestinationPath .
+          Add-Content -Path $env:GITHUB_PATH -Value "$PWD\platform-tools"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality gate (full test suite)
+        run: npm test
+
+      # `dist` = typecheck + esbuild main/preload + Vite renderer + NSIS build.
+      # --publish always uploads installer, blockmap and latest.yml to the
+      # GitHub release for this tag (releaseType: release, not draft).
+      - name: Build and publish to GitHub Releases
+        run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No signing certificate on CI: skip certificate discovery.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidbridge-installer
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+          if-no-files-found: error

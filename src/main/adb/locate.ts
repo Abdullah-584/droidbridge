@@ -1,11 +1,60 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { ToolName, ToolSource } from '../../shared/types';
 
 export interface LocateResult {
   path: string | null;
   source: ToolSource;
 }
+
+// ---------------------------------------------------------------------------
+// Windows registry (Android SDK installer's own record of the SDK path)
+// ---------------------------------------------------------------------------
+
+/** Reads a named value from a registry key; returns null when absent/unreadable. */
+export type RegReader = (key: string, valueName: string) => string | null;
+
+/** Keys the Android SDK installer writes, most specific first (64-bit view last). */
+export const ADB_REG_KEYS = [
+  'HKCU\\Software\\Android SDK Tools',
+  'HKLM\\SOFTWARE\\Android SDK Tools',
+  'HKLM\\SOFTWARE\\WOW6432Node\\Android SDK Tools',
+] as const;
+
+/**
+ * Extracts one value from `reg query <key>` output. Handles both REG_SZ and
+ * REG_EXPAND_SZ (the SDK installer has used either); returns null when the
+ * value is absent or the input is an error message.
+ */
+export function parseRegQueryValue(output: string, valueName: string): string | null {
+  const pattern = new RegExp(
+    `^\\s*${valueName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+REG_(?:SZ|EXPAND_SZ)\\s+(.+?)\\s*$`,
+    'mi',
+  );
+  const match = pattern.exec(output);
+  return match ? match[1] : null;
+}
+
+/**
+ * Production registry reader: `reg.exe query <key> /v <name>` with argv (never
+ * a shell), a short timeout, and a null on any failure — a missing key is the
+ * normal case on machines without the SDK, not an error.
+ */
+export const queryWindowsRegistry: RegReader = (key, valueName) => {
+  if (process.platform !== 'win32') return null;
+  try {
+    const output = execFileSync('reg', ['query', key, '/v', valueName], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 2000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return parseRegQueryValue(output, valueName);
+  } catch {
+    return null;
+  }
+};
 
 export interface FileProbe {
   isFile(absolutePath: string): boolean;
@@ -42,10 +91,33 @@ function join(...parts: string[]): string {
   return path.join(...parts.filter(Boolean));
 }
 
-/** Finds the ADB executable: override → SDK env vars → PATH → default SDK dir. */
-export function findAdb(env: NodeJS.ProcessEnv, probe: FileProbe): LocateResult {
+/**
+ * Finds the ADB executable: override → Windows registry → SDK env vars →
+ * PATH → default SDK dir.
+ *
+ * The registry check comes before the env vars because it records where the
+ * SDK installer actually put the SDK — a stale ANDROID_HOME in a long-lived
+ * shell (or a launched-from-Explorer app that never saw the user env) is the
+ * exact failure this lookup fixes.
+ */
+export function findAdb(
+  env: NodeJS.ProcessEnv,
+  probe: FileProbe,
+  readReg: RegReader = queryWindowsRegistry,
+): LocateResult {
   const override = env.DROIDBRIDGE_ADB_PATH;
   if (override && probe.isFile(override)) return { path: override, source: 'env' };
+
+  // The SDK installer writes its root (or platform-tools dir) here.
+  for (const key of ADB_REG_KEYS) {
+    const sdkPath = readReg(key, 'Path');
+    if (!sdkPath) continue;
+    const candidate = firstExisting(
+      [join(sdkPath, 'platform-tools', windowsNames('adb')[0]), join(sdkPath, windowsNames('adb')[0])],
+      probe,
+    );
+    if (candidate) return { path: candidate, source: 'registry' };
+  }
 
   for (const key of ['ANDROID_HOME', 'ANDROID_SDK_ROOT'] as const) {
     const sdk = env[key];

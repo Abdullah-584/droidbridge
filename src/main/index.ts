@@ -1,7 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import { LogcatManager } from './adb/logcat';
 import { ScrcpyManager } from './services/scrcpy';
+import { createUpdater, type UpdaterHandle } from './services/updater';
 import { createHandlerSpecs } from './ipc/handlers';
 import { registerInvokeHandlers } from './ipc/registry';
 import { processRegistry } from './process/registry';
@@ -27,6 +29,7 @@ if (!gotLock) {
 installSecurity();
 
 let mainWindow: BrowserWindow | null = null;
+let updaterHandle: UpdaterHandle | null = null;
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -69,7 +72,7 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-function registerIpc(): void {
+function registerIpc(): UpdaterHandle {
   const logcat = new LogcatManager(
     processRegistry,
     {
@@ -92,9 +95,17 @@ function registerIpc(): void {
     },
   });
 
+  // Auto-update: packaged builds only (see services/updater), statuses stream
+  // to the renderer on the `update:status` event channel.
+  const updater = createUpdater(autoUpdater, {
+    isPackaged: app.isPackaged,
+    emit: (status) => mainWindow?.webContents.send('update:status', status),
+  });
+
   const specs = createHandlerSpecs({
     logcat,
     scrcpy,
+    installUpdate: () => updater.install(),
     appVersion: app.getVersion(),
     platform: process.platform,
     getWindow: () => mainWindow ?? undefined,
@@ -112,11 +123,13 @@ function registerIpc(): void {
   });
 
   registerInvokeHandlers(ipcMain, specs);
+  return updater;
 }
 
 app.whenReady().then(() => {
-  registerIpc();
+  updaterHandle = registerIpc();
   mainWindow = createWindow();
+  updaterHandle.start();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -132,5 +145,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  updaterHandle?.stop();
   processRegistry.stopAll();
 });

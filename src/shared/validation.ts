@@ -7,8 +7,15 @@
  * individual argv entries.
  */
 
-import type { AppError, LogcatBuffer, LogcatOptions, ScrcpyOptions } from './types';
-import { LOGCAT_BUFFERS, LOGCAT_LEVELS } from './types';
+import type {
+  AppError,
+  LogcatBuffer,
+  LogcatExportFormat,
+  LogcatLine,
+  LogcatOptions,
+  ScrcpyOptions,
+} from './types';
+import { LOGCAT_BUFFERS, LOGCAT_EXPORT_FORMATS, LOGCAT_LEVELS } from './types';
 
 export class ValidationError extends Error implements AppError {
   readonly code = 'VALIDATION_ERROR';
@@ -125,16 +132,66 @@ export function assertDialogTitle(raw: unknown): string {
   return raw;
 }
 
-export function assertLogLineBatch(raw: unknown): string[] {
-  if (!Array.isArray(raw) || raw.length > 500_000) {
+const MAX_EXPORT_LINES = 500_000;
+const MAX_LINE_FIELD = 8192;
+
+function optionalBoundedString(value: unknown, field: string, max: number): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string' || value.length > max) {
+    throw new ValidationError(`Invalid log line ${field}.`);
+  }
+  return value;
+}
+
+function optionalInt(value: unknown, field: string): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new ValidationError(`Invalid log line ${field}.`);
+  }
+  return value;
+}
+
+function assertLogcatLine(raw: unknown): LogcatLine {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new ValidationError('Invalid log export line.');
+  }
+  const input = raw as Record<string, unknown>;
+  const seq = optionalInt(input.seq, 'seq');
+  if (seq === null) {
+    throw new ValidationError('Invalid log line seq.');
+  }
+  return {
+    seq,
+    raw: optionalBoundedString(input.raw, 'raw', MAX_LINE_FIELD) ?? '',
+    time: optionalBoundedString(input.time, 'time', 64),
+    pid: optionalInt(input.pid, 'pid'),
+    tid: optionalInt(input.tid, 'tid'),
+    level: optionalBoundedString(input.level, 'level', 16),
+    tag: optionalBoundedString(input.tag, 'tag', MAX_LINE_FIELD),
+    message: optionalBoundedString(input.message, 'message', MAX_LINE_FIELD),
+  };
+}
+
+/** Validates a structured logcat export request (format + parsed lines). */
+export function assertLogcatExport(
+  raw: unknown,
+): { format: LogcatExportFormat; lines: LogcatLine[] } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new ValidationError('Invalid log export payload.');
   }
-  for (const line of raw) {
-    if (typeof line !== 'string' || line.length > 8192) {
-      throw new ValidationError('Invalid log export payload.');
-    }
+  const input = raw as Record<string, unknown>;
+  const format = input.format;
+  if (typeof format !== 'string' || !(LOGCAT_EXPORT_FORMATS as readonly string[]).includes(format)) {
+    throw new ValidationError('Invalid export format.');
   }
-  return raw;
+  const lines = input.lines;
+  if (!Array.isArray(lines) || lines.length > MAX_EXPORT_LINES) {
+    throw new ValidationError('Invalid log export payload.');
+  }
+  return {
+    format: format as LogcatExportFormat,
+    lines: lines.map((line) => assertLogcatLine(line)),
+  };
 }
 
 const LOGCAT_LEVEL_RANK: Record<string, number> = {

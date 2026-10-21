@@ -61,6 +61,7 @@ describe('registerInvokeHandlers', () => {
       getWindow: () => undefined,
       openExternal: () => undefined,
       pickFolder: async () => null,
+      installUpdate: () => undefined,
     };
     registerInvokeHandlers(ipc, createHandlerSpecs(fakeDeps));
     expect(new Set(registered)).toEqual(new Set(INVOKE_CHANNELS));
@@ -77,6 +78,7 @@ describe('createHandlerSpecs validation', () => {
     getWindow: () => undefined,
     openExternal: () => undefined,
     pickFolder: async () => null,
+    installUpdate: () => undefined,
   };
   const specs = createHandlerSpecs(fakeDeps);
 

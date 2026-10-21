@@ -30,7 +30,7 @@ export interface IpcInvokeMap {
 - **Preload** allow-lists channel names (`INVOKE_CHANNELS`, `EVENT_CHANNELS`) and refuses anything else before touching `ipcRenderer`.
 - **Renderer** calls `call('devices:list', null)` through `lib/api.ts`, which unwraps the envelope and throws a typed `ApiError` for the UI to display.
 
-Main → renderer events (`logcat:lines`, `logcat:exit`, `scrcpy:exit`) are batched and bounded; see `LogcatManager`.
+Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit` (batched and bounded — see `LogcatManager`) and `update:status` (a small `UpdateStatus` state object from the auto-updater).
 
 ## External process execution
 
@@ -58,7 +58,8 @@ All lookups are pure functions over an injectable `FileProbe`, which is what mak
 - `adb/logcat.ts` — session manager: max 4 concurrent sessions, `-T 1000` tail-then-follow, line parsing (`-v threadtime`), batching (200 lines / 250 ms) and a 64 KiB guard for unterminated chunks.
 - `services/scrcpy.ts` — pure `buildScrcpyArgs` + managed launch/stop; missing scrcpy is an honest error with the winget command.
 - `services/tools.ts` — system status probe, `flutter doctor -v`, `flutter devices`, `flutter pub get` (refuses folders without `pubspec.yaml`), VS Code open-folder.
-- `services/exporter.ts` — the only file writer; path always comes from the native save dialog.
+- `services/exporter.ts` — the only writer of user-chosen files; path always comes from the native save dialog.
+- `services/updater.ts` — auto-update policy: packaged builds only, checks the GitHub Releases feed at launch and every 4 h, auto-downloads, streams `UpdateStatus` on `update:status`, and refuses to quit into the installer until a download has fully completed. `electron-updater`'s `autoUpdater` is injected as a structural interface (`UpdaterLike`), so the policy is unit-tested without Electron.
 
 ## Renderer
 
@@ -72,7 +73,8 @@ Views are plain function components over `components/ui.tsx` primitives (`Button
 
 ## Build pipeline
 
-- `scripts/build-main.mjs` — esbuild bundles main + preload (CJS, `external: ['electron']`, minified in prod).
+- `scripts/build-main.mjs` — esbuild bundles main + preload (CJS, `external: ['electron', 'electron-updater']`, minified in prod). `electron-updater` stays external because it resolves `app-update.yml` from the packaged resources at runtime.
 - `scripts/dev.mjs` — orchestrates esbuild watch + Vite dev server + Electron with `DROIDBRIDGE_DEV_SERVER_URL`; waits for the dev server before launching.
 - `vite build` → `dist/renderer` (`base: './'` so `loadFile` works).
-- `electron-builder` → NSIS x64 installer (`electron-builder.yml`), shipping only `dist/**` + `package.json` inside an asar.
+- `electron-builder` → NSIS x64 installer (`electron-builder.yml`), shipping `dist/**` + `package.json` + the production `node_modules` (just `electron-updater`) inside an asar.
+- `publish: github` in `electron-builder.yml` embeds `app-update.yml` (the update feed: `Abdullah-584/droidbridge`, `releaseType: release`) and, when CI runs with `--publish always`, uploads the installer + blockmap + `latest.yml` as the GitHub Release for the tag. See `docs/releasing.md`.

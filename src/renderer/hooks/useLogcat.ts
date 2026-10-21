@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LogcatLine, LogcatOptions } from '../../shared/types';
+import type { LogcatExportFormat, LogcatExportResult, LogcatLine, LogcatOptions } from '../../shared/types';
 import { call, subscribe } from '../lib/api';
 
 const MAX_BUFFERED_LINES = 5000;
@@ -121,10 +121,11 @@ export function useLogcat() {
     await call('logcat:clear', { serial });
   }, []);
 
-  const exportLines = useCallback(async (lines: string[]): Promise<string> => {
-    const result = await call('logcat:export', { sessionId: sessionRef.current ?? 'manual-export', lines });
-    return result.path;
-  }, []);
+  const exportLines = useCallback(
+    async (lines: LogcatLine[], format: LogcatExportFormat): Promise<LogcatExportResult> =>
+      call('logcat:export', { format, lines }),
+    [],
+  );
 
   useEffect(() => {
     const id = sessionRef.current;

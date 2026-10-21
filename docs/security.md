@@ -36,7 +36,8 @@ Every external process is started in `src/main/adb/run.ts` with `spawn(bin, argv
 
 - `flutter pub get` runs with the picked folder as `cwd` and refuses folders without a `pubspec.yaml`; VS Code integration only runs `code <folder>`. Neither writes, renames or deletes user files.
 - Folder paths come from the native folder picker (`dialogs:pick-folder`); when a path does arrive over IPC it must be an absolute, control-character-free path (`assertProjectPath`).
-- The only file DroidBridge writes is the logcat export, and its path comes from the native save dialog (`services/exporter.ts`).
+- The only file DroidBridge writes on the user's behalf is the logcat export, and its path comes from the native save dialog (`services/exporter.ts`).
+- The auto-updater writes only into its own application cache, and it downloads solely from the GitHub Releases feed baked in at build time (`app-update.yml`) — never from a user-controlled or response-controlled URL.
 
 ## Guarantee 4 — hardened renderer
 

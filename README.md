@@ -17,6 +17,7 @@ Everything you see is real: DroidBridge shells out to the actual `adb`, `flutter
 | **Flutter** | SDK detection, `flutter doctor -v`, `flutter devices`, `flutter pub get` in a folder you pick (never modifies project files) |
 | **VS Code** | CLI detection, open any project folder with `code <dir>` |
 | **scrcpy** | Optional mirroring with fps/bitrate/audio/on-top/fullscreen options, launch & stop managed by DroidBridge |
+| **Auto-updates** | Installed builds check GitHub Releases at launch and every 4 h, download in the background, then **Restart now** (or install on quit) |
 
 ## Requirements
 
@@ -29,6 +30,8 @@ DroidBridge also honours these optional overrides: `DROIDBRIDGE_ADB_PATH`, `DROI
 ## Install (prebuilt)
 
 Run `release\DroidBridge-Setup-1.0.0-x64.exe` — a per-user NSIS installer with Start Menu and Desktop shortcuts. No admin rights required.
+
+Installed copies stay current: DroidBridge checks the project's [GitHub Releases](https://github.com/Abdullah-584/droidbridge/releases) for a newer version, downloads it in the background and offers **Restart now** — and installs on quit either way.
 
 ## Develop
 

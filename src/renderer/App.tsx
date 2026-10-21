@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Sidebar, type ViewId } from './components/Sidebar';
 import { StatusPill } from './components/ui';
+import { UpdateBanner } from './components/UpdateBanner';
 import { IconRefresh } from './components/icons';
 import { useDevices } from './hooks/useDevices';
 import { useSystemStatus } from './hooks/useSystemStatus';
+import { useUpdate } from './hooks/useUpdate';
 import { DashboardView } from './views/DashboardView';
 import { DevicesView } from './views/DevicesView';
 import { LogcatView } from './views/LogcatView';
@@ -15,6 +17,7 @@ export default function App() {
   const [selectedSerial, setSelectedSerial] = useState<string | null>(null);
   const devices = useDevices();
   const system = useSystemStatus();
+  const update = useUpdate();
 
   const connected = useMemo(
     () => devices.devices.filter((d) => d.state === 'device'),
@@ -83,6 +86,13 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        <UpdateBanner
+          status={update.status}
+          installError={update.installError}
+          onInstall={() => void update.install()}
+          onDismiss={update.dismiss}
+        />
 
         <main className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {view === 'dashboard' && (

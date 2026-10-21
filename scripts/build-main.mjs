@@ -12,7 +12,9 @@ const common = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  external: ['electron'],
+  // electron-updater must stay external: it resolves app-update.yml at
+  // runtime from the packaged resources, which bundling would break.
+  external: ['electron', 'electron-updater'],
   logLevel: 'info',
   sourcemap: dev,
   minify: !dev,

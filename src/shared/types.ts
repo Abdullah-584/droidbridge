@@ -23,7 +23,7 @@ export interface AppError {
 // ---------------------------------------------------------------------------
 
 export type ToolName = 'adb' | 'flutter' | 'scrcpy' | 'code';
-export type ToolSource = 'env' | 'path' | 'default-location' | 'not-found';
+export type ToolSource = 'env' | 'registry' | 'path' | 'default-location' | 'not-found';
 
 export interface ToolInfo {
   tool: ToolName;
@@ -182,6 +182,14 @@ export interface LogcatStartResult {
   sessionId: string;
 }
 
+export const LOGCAT_EXPORT_FORMATS = ['log', 'json', 'csv'] as const;
+export type LogcatExportFormat = (typeof LOGCAT_EXPORT_FORMATS)[number];
+
+export interface LogcatExportResult {
+  path: string;
+  count: number;
+}
+
 export interface LogcatSessionInfo {
   sessionId: string;
   serial: string;
@@ -239,6 +247,22 @@ export interface ScrcpyStartResult {
 }
 
 // ---------------------------------------------------------------------------
+// Updates
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-update lifecycle reported on the `update:status` event channel.
+ * `downloaded` means the new version is fully on disk and ready to install.
+ */
+export type UpdateStatus =
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available' }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string };
+
+// ---------------------------------------------------------------------------
 // IPC maps
 // ---------------------------------------------------------------------------
 
@@ -258,7 +282,7 @@ export interface IpcInvokeMap {
   'logcat:stop': { args: { sessionId: string }; result: null };
   'logcat:clear': { args: { serial: string }; result: null };
   'logcat:sessions': { args: null; result: { sessions: LogcatSessionInfo[] } };
-  'logcat:export': { args: { sessionId: string; lines: string[] }; result: { path: string } };
+  'logcat:export': { args: { format: LogcatExportFormat; lines: LogcatLine[] }; result: LogcatExportResult };
   'flutter:doctor': { args: null; result: CommandResult };
   'flutter:devices': { args: null; result: FlutterDevicesResult };
   'flutter:pub-get': { args: { projectPath: string }; result: CommandResult };
@@ -266,12 +290,14 @@ export interface IpcInvokeMap {
   'dialogs:pick-folder': { args: { title: string }; result: string | null };
   'scrcpy:start': { args: ScrcpyOptions; result: ScrcpyStartResult };
   'scrcpy:stop': { args: { sessionId: string }; result: null };
+  'update:install': { args: null; result: null };
 }
 
 export interface IpcEventMap {
   'logcat:lines': { sessionId: string; lines: LogcatLine[] };
   'logcat:exit': { sessionId: string; code: number | null; error?: string };
   'scrcpy:exit': { sessionId: string; code: number | null; error?: string };
+  'update:status': UpdateStatus;
 }
 
 export type InvokeChannel = keyof IpcInvokeMap;
