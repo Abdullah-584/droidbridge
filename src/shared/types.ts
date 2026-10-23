@@ -247,6 +247,19 @@ export interface ScrcpyStartResult {
 }
 
 // ---------------------------------------------------------------------------
+// Emulator
+// ---------------------------------------------------------------------------
+
+/** AVD names (`emulator -list-avds`) available to boot. */
+export interface EmulatorListResult {
+  avds: string[];
+}
+
+export interface EmulatorStartResult {
+  sessionId: string;
+}
+
+// ---------------------------------------------------------------------------
 // Updates
 // ---------------------------------------------------------------------------
 
@@ -290,6 +303,8 @@ export interface IpcInvokeMap {
   'dialogs:pick-folder': { args: { title: string }; result: string | null };
   'scrcpy:start': { args: ScrcpyOptions; result: ScrcpyStartResult };
   'scrcpy:stop': { args: { sessionId: string }; result: null };
+  'emulator:list': { args: null; result: EmulatorListResult };
+  'emulator:start': { args: { avd: string }; result: EmulatorStartResult };
   'update:install': { args: null; result: null };
 }
 
@@ -297,6 +312,7 @@ export interface IpcEventMap {
   'logcat:lines': { sessionId: string; lines: LogcatLine[] };
   'logcat:exit': { sessionId: string; code: number | null; error?: string };
   'scrcpy:exit': { sessionId: string; code: number | null; error?: string };
+  'emulator:exit': { sessionId: string; avd: string; code: number | null; error?: string };
   'update:status': UpdateStatus;
 }
 

@@ -30,7 +30,7 @@ export interface IpcInvokeMap {
 - **Preload** allow-lists channel names (`INVOKE_CHANNELS`, `EVENT_CHANNELS`) and refuses anything else before touching `ipcRenderer`.
 - **Renderer** calls `call('devices:list', null)` through `lib/api.ts`, which unwraps the envelope and throws a typed `ApiError` for the UI to display.
 
-Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit` (batched and bounded — see `LogcatManager`) and `update:status` (a small `UpdateStatus` state object from the auto-updater).
+Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit`, `emulator:exit` (batched and bounded — see `LogcatManager`) and `update:status` (a small `UpdateStatus` state object from the auto-updater).
 
 ## External process execution
 
@@ -38,7 +38,7 @@ Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit` (batch
 
 - `runCommand(bin, argv, opts)` → `spawn(bin, argv, { shell: false, windowsHide: true })`, with timeout (default 15 s, SIGTERM → SIGKILL escalation), output caps (default 2 MiB, `truncated` flag), and structured errors (`TOOL_NOT_FOUND`, `INVALID_COMMAND`, `UNSAFE_ARGUMENT`).
 - **Batch files** (`.bat`/`.cmd` — Flutter and the VS Code CLI on Windows) cannot be spawned directly on modern Node. `resolveExecutable()` routes them through `cmd.exe /d /s /c` with every token quoted, `windowsVerbatimArguments` (cmd does not understand backslash-escaped quotes), and a **metacharacter denylist** (`" % & | < > ^ ( ) !`) because batch scripts re-parse their own arguments. See `docs/security.md`.
-- `spawnManaged()` is the long-lived variant used by logcat/scrcpy; both register in `ProcessRegistry`, which is stopped in `before-quit` so no orphan `adb logcat`/`scrcpy` survives the app.
+- `spawnManaged()` is the long-lived variant used by logcat, scrcpy and the emulator launcher; all register in `ProcessRegistry`, which is stopped in `before-quit` so no orphan `adb logcat`/`scrcpy`/emulator survives the app.
 
 ## Tool location
 
@@ -51,12 +51,15 @@ Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit` (batch
 
 All lookups are pure functions over an injectable `FileProbe`, which is what makes them unit-testable.
 
+The **emulator** resolves through `findEmulator()` with the same priority order, probing `<sdk>/emulator/` (its own SDK package, not platform-tools) plus the legacy `<sdk>/tools/` layout, and deriving the SDK root even when the registry points at `platform-tools`. It is intentionally outside `findTool`: an absent emulator is a normal setup (DroidBridge works fine with physical devices only) and must never read as a toolchain problem.
+
 ## Key services
 
 - `services/devices.ts` — `listDevices` (`adb devices -l`), `getDeviceDetails` (parallel `getprop`, `dumpsys battery`, `df -k`, `/proc/meminfo`, `wm size/density`, `ip addr`, `getenforce`), `runDiagnostics` (turns live state into pass/warn/fail checks with hints), `rebootDevice`, `disconnectDevice`.
 - `services/pairing.ts` — `adb pair` / `connect` / `disconnect`, `restartAdbServer` (kill-server + start-server), IPv6-aware endpoint formatting.
 - `adb/logcat.ts` — session manager: max 4 concurrent sessions, `-T 1000` tail-then-follow, line parsing (`-v threadtime`), batching (200 lines / 250 ms) and a 64 KiB guard for unterminated chunks.
 - `services/scrcpy.ts` — pure `buildScrcpyArgs` + managed launch/stop; missing scrcpy is an honest error with the winget command.
+- `services/emulator.ts` — AVD management: pure `parseAvdList` (`emulator -list-avds` output filtered through the shared AVD-name validator) + `EmulatorManager.start()` which spawns the boot via `spawnManaged`, tracks it in `ProcessRegistry`, keeps a bounded tail of the emulator's output, and reports the outcome on the `emulator:exit` event — so a boot failure like `PANIC: unknown AVD name` reaches the dashboard instead of dying in a hidden console.
 - `services/tools.ts` — system status probe, `flutter doctor -v`, `flutter devices`, `flutter pub get` (refuses folders without `pubspec.yaml`), VS Code open-folder.
 - `services/exporter.ts` — the only writer of user-chosen files; path always comes from the native save dialog.
 - `services/updater.ts` — auto-update policy: packaged builds only, checks the GitHub Releases feed at launch and every 4 h, auto-downloads, streams `UpdateStatus` on `update:status`, and refuses to quit into the installer until a download has fully completed. `electron-updater`'s `autoUpdater` is injected as a structural interface (`UpdaterLike`), so the policy is unit-tested without Electron.

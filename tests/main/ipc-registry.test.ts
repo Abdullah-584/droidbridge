@@ -5,6 +5,7 @@ import { ValidationError } from '../../src/shared/validation';
 import { INVOKE_CHANNELS } from '../../src/shared/channels';
 import type { LogcatManager } from '../../src/main/adb/logcat';
 import type { ScrcpyManager } from '../../src/main/services/scrcpy';
+import type { EmulatorManager } from '../../src/main/services/emulator';
 
 describe('executeChannel', () => {
   it('wraps successful handlers in a Result envelope', async () => {
@@ -56,6 +57,7 @@ describe('registerInvokeHandlers', () => {
     const fakeDeps = {
       logcat: {} as LogcatManager,
       scrcpy: {} as ScrcpyManager,
+      emulator: {} as EmulatorManager,
       appVersion: '0.0.0',
       platform: 'win32',
       getWindow: () => undefined,
@@ -73,6 +75,7 @@ describe('createHandlerSpecs validation', () => {
   const fakeDeps = {
     logcat: {} as LogcatManager,
     scrcpy: {} as ScrcpyManager,
+    emulator: {} as EmulatorManager,
     appVersion: '0.0.0',
     platform: 'win32',
     getWindow: () => undefined,
@@ -121,5 +124,15 @@ describe('createHandlerSpecs validation', () => {
   it('accepts null-arg channels without payload', () => {
     expect(specs['system:status'].validate(undefined)).toBeNull();
     expect(specs['devices:list'].validate(null)).toBeNull();
+    expect(specs['emulator:list'].validate(null)).toBeNull();
+  });
+
+  it('validates emulator start payloads', () => {
+    expect(specs['emulator:start'].validate({ avd: 'Pixel_7_API_34' })).toEqual({ avd: 'Pixel_7_API_34' });
+    expect(() => specs['emulator:start'].validate({ avd: '../../etc' })).toThrow(ValidationError);
+    expect(() => specs['emulator:start'].validate({ avd: '-list-avds' })).toThrow(ValidationError);
+    expect(() => specs['emulator:start'].validate({ avd: '' })).toThrow(ValidationError);
+    expect(() => specs['emulator:start'].validate({})).toThrow(ValidationError);
+    expect(() => specs['emulator:start'].validate({ avd: 42 })).toThrow(ValidationError);
   });
 });

@@ -62,6 +62,24 @@ export interface FileProbe {
   listDir?(dirPath: string): string[];
 }
 
+/** Real-filesystem probe used by production lookups (tests inject their own). */
+export const defaultFileProbe: FileProbe = {
+  isFile(p: string): boolean {
+    try {
+      return fs.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  },
+  listDir(p: string): string[] {
+    try {
+      return fs.readdirSync(p);
+    } catch {
+      return [];
+    }
+  },
+};
+
 /** Searches the PATH environment variable for any of the candidate names. */
 export function whichSync(candidateNames: readonly string[], pathValue: string | undefined, probe: FileProbe): string | null {
   if (!pathValue) return null;
@@ -136,6 +154,69 @@ export function findAdb(
     'C:\\Android\\platform-tools\\adb.exe',
   ];
   const fromDefault = firstExisting(defaults, probe);
+  if (fromDefault) return { path: fromDefault, source: 'default-location' };
+
+  return { path: null, source: 'not-found' };
+}
+
+/** The SDK ships `emulator.exe` on Windows and `emulator` elsewhere. */
+function emulatorName(): string {
+  return process.platform === 'win32' ? 'emulator.exe' : 'emulator';
+}
+
+/**
+ * Finds the Android emulator binary: override → SDK registry → SDK env vars →
+ * PATH → default SDK locations.
+ *
+ * The emulator ships as its own SDK package ("Emulator" in the SDK Manager),
+ * not inside platform-tools — so the lookup probes `<sdk>/emulator/` plus the
+ * legacy `<sdk>/tools/` layout, and derives the SDK root when the registry
+ * points at the platform-tools directory. It is not part of `findTool`:
+ * DroidBridge runs fine without it, so its absence must never surface as a
+ * toolchain problem for adb/Flutter/scrcpy/code.
+ */
+export function findEmulator(
+  env: NodeJS.ProcessEnv = process.env,
+  probe: FileProbe = defaultFileProbe,
+  readReg: RegReader = queryWindowsRegistry,
+): LocateResult {
+  const override = env.DROIDBRIDGE_EMULATOR_PATH;
+  if (override && probe.isFile(override)) return { path: override, source: 'env' };
+
+  const name = emulatorName();
+  const sdkCandidates = (sdkPath: string): string[] => [
+    join(sdkPath, 'emulator', name),
+    join(sdkPath, 'tools', name), // legacy SDK layout (pre-25)
+  ];
+
+  for (const key of ADB_REG_KEYS) {
+    const sdkPath = readReg(key, 'Path');
+    if (!sdkPath) continue;
+    // The registry may record the SDK root or its platform-tools directory.
+    const candidate = firstExisting(
+      [...sdkCandidates(sdkPath), join(sdkPath, '..', 'emulator', name)],
+      probe,
+    );
+    if (candidate) return { path: candidate, source: 'registry' };
+  }
+
+  for (const key of ['ANDROID_HOME', 'ANDROID_SDK_ROOT'] as const) {
+    const sdk = env[key];
+    if (!sdk) continue;
+    const candidate = firstExisting(sdkCandidates(sdk), probe);
+    if (candidate) return { path: candidate, source: 'env' };
+  }
+
+  const fromPath = whichSync(windowsNames('emulator'), env.PATH, probe);
+  if (fromPath) return { path: fromPath, source: 'path' };
+
+  const localAppData = env.LOCALAPPDATA;
+  const home = env.USERPROFILE ?? env.HOME ?? '';
+  const fromDefault = firstExisting([
+    localAppData ? join(localAppData, 'Android', 'Sdk', 'emulator', name) : '',
+    join(home, 'Library', 'Android', 'sdk', 'emulator', name), // macOS
+    join(home, 'Android', 'Sdk', 'emulator', name), // Linux
+  ], probe);
   if (fromDefault) return { path: fromDefault, source: 'default-location' };
 
   return { path: null, source: 'not-found' };
@@ -256,21 +337,5 @@ const finders: Record<ToolName, (env: NodeJS.ProcessEnv, probe: FileProbe) => Lo
 };
 
 export function findTool(tool: ToolName, env: NodeJS.ProcessEnv = process.env, probe?: FileProbe): LocateResult {
-  const defaultProbe: FileProbe = {
-    isFile(p: string): boolean {
-      try {
-        return fs.statSync(p).isFile();
-      } catch {
-        return false;
-      }
-    },
-    listDir(p: string): string[] {
-      try {
-        return fs.readdirSync(p);
-      } catch {
-        return [];
-      }
-    },
-  };
-  return finders[tool](env, probe ?? defaultProbe);
+  return finders[tool](env, probe ?? defaultFileProbe);
 }

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   findAdb,
+  findEmulator,
   findFlutter,
   findScrcpy,
   findVSCode,
@@ -238,3 +239,92 @@ describe('winget package scan (scrcpy)', () => {
 function probeOf(...files: string[]): FileProbe {
   return probeFor(files.filter(Boolean));
 }
+
+describe('findEmulator', () => {
+  /** Platform-correct emulator binary name (Windows CI and macOS CI both run these). */
+  const EMULATOR = process.platform === 'win32' ? 'emulator.exe' : 'emulator';
+
+  it('prefers the explicit override', () => {
+    const env = { DROIDBRIDGE_EMULATOR_PATH: `C${sep}custom${sep}${EMULATOR}`, PATH: '' };
+    expect(findEmulator(env, probeOf(env.DROIDBRIDGE_EMULATOR_PATH), noReg)).toEqual({
+      path: env.DROIDBRIDGE_EMULATOR_PATH,
+      source: 'env',
+    });
+  });
+
+  it('uses the SDK registry path before env vars and PATH', () => {
+    const sdk = `C${sep}sdk`;
+    const env = { ANDROID_HOME: `C${sep}other-sdk`, PATH: `C${sep}pathbin` };
+    const probe = probeOf(
+      `${sdk}${sep}emulator${sep}${EMULATOR}`,
+      `${env.ANDROID_HOME}${sep}emulator${sep}${EMULATOR}`,
+      `${env.PATH}${sep}${EMULATOR}`,
+    );
+    const readReg: RegReader = () => sdk;
+    expect(findEmulator(env, probe, readReg)).toEqual({
+      path: `${sdk}${sep}emulator${sep}${EMULATOR}`,
+      source: 'registry',
+    });
+  });
+
+  it('resolves a platform-tools registry Path through its parent directory', () => {
+    const platformTools = `C${sep}sdk${sep}platform-tools`;
+    const emu = `C${sep}sdk${sep}emulator${sep}${EMULATOR}`;
+    expect(findEmulator({ PATH: '' }, probeOf(emu), () => platformTools)).toEqual({
+      path: emu,
+      source: 'registry',
+    });
+  });
+
+  it('accepts the legacy SDK tools/ directory from the registry', () => {
+    const sdk = `C${sep}sdk`;
+    const legacy = `${sdk}${sep}tools${sep}${EMULATOR}`;
+    expect(findEmulator({ PATH: '' }, probeOf(legacy), () => sdk)).toEqual({
+      path: legacy,
+      source: 'registry',
+    });
+  });
+
+  it('uses ANDROID_HOME / ANDROID_SDK_ROOT before PATH', () => {
+    const env = { ANDROID_SDK_ROOT: `C${sep}sdk`, PATH: `C${sep}pathbin` };
+    const probe = probeOf(
+      `${env.ANDROID_SDK_ROOT}${sep}emulator${sep}${EMULATOR}`,
+      `${env.PATH}${sep}${EMULATOR}`,
+    );
+    expect(findEmulator(env, probe, noReg)).toEqual({
+      path: `${env.ANDROID_SDK_ROOT}${sep}emulator${sep}${EMULATOR}`,
+      source: 'env',
+    });
+  });
+
+  it('falls back to PATH then default SDK locations', () => {
+    const env = { PATH: `C${sep}pathbin`, LOCALAPPDATA: `C${sep}users${sep}me${sep}AppData${sep}Local` };
+    expect(findEmulator(env, probeOf(`${env.PATH}${sep}${EMULATOR}`), noReg)).toEqual({
+      path: `${env.PATH}${sep}${EMULATOR}`,
+      source: 'path',
+    });
+
+    const defaultPath = `${env.LOCALAPPDATA}${sep}Android${sep}Sdk${sep}emulator${sep}${EMULATOR}`;
+    expect(findEmulator(env, probeOf(defaultPath), noReg)).toEqual({
+      path: defaultPath,
+      source: 'default-location',
+    });
+
+    expect(findEmulator(env, probeOf(), noReg)).toEqual({ path: null, source: 'not-found' });
+  });
+
+  it('finds the emulator under the user home SDK directories (macOS/Linux defaults)', () => {
+    const home = `C${sep}home${sep}dev`;
+    const macPath = `${home}${sep}Library${sep}Android${sep}sdk${sep}emulator${sep}${EMULATOR}`;
+    expect(findEmulator({ HOME: home, PATH: '' }, probeOf(macPath), noReg)).toEqual({
+      path: macPath,
+      source: 'default-location',
+    });
+
+    const linuxPath = `${home}${sep}Android${sep}Sdk${sep}emulator${sep}${EMULATOR}`;
+    expect(findEmulator({ HOME: home, PATH: '' }, probeOf(linuxPath), noReg)).toEqual({
+      path: linuxPath,
+      source: 'default-location',
+    });
+  });
+});

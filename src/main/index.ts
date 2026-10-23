@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import { LogcatManager } from './adb/logcat';
+import { EmulatorManager } from './services/emulator';
 import { ScrcpyManager } from './services/scrcpy';
 import { createUpdater, type UpdaterHandle } from './services/updater';
 import { createHandlerSpecs } from './ipc/handlers';
@@ -95,6 +96,12 @@ function registerIpc(): UpdaterHandle {
     },
   });
 
+  const emulator = new EmulatorManager(processRegistry, {
+    onExit({ sessionId, avd, code, error }) {
+      mainWindow?.webContents.send('emulator:exit', { sessionId, avd, code, error });
+    },
+  });
+
   // Auto-update: packaged builds only (see services/updater), statuses stream
   // to the renderer on the `update:status` event channel.
   const updater = createUpdater(autoUpdater, {
@@ -105,6 +112,7 @@ function registerIpc(): UpdaterHandle {
   const specs = createHandlerSpecs({
     logcat,
     scrcpy,
+    emulator,
     installUpdate: () => updater.install(),
     appVersion: app.getVersion(),
     platform: process.platform,

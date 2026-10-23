@@ -13,7 +13,7 @@ untrusted input:          renderer (React, web tech)
                           main process (Node)
                                   │
                                   ▼  spawn(bin, argv, { shell: false })
-                          adb.exe / flutter.bat / scrcpy.exe / code.cmd → USB/Wi-Fi devices
+                          adb.exe / flutter.bat / scrcpy.exe / code.cmd / emulator.exe → USB/Wi-Fi devices
 ```
 
 ## Guarantee 1 — no shell command strings, ever
@@ -51,13 +51,13 @@ Enforced in `src/main/index.ts` and `src/main/security.ts`:
 ## Guarantee 5 — validated, structured IPC
 
 - The preload exposes exactly one namespace with an allow-list of channel names; unknown channels return `UNKNOWN_CHANNEL` without reaching `ipcMain`.
-- Every handler validates its payload (`assertSerial`, `assertHost`, `assertPort`, `assertPairCode`, `assertLogcatOptions`, `assertScrcpyOptions`, …) before any logic runs; failures come back as `{ ok: false, error: { code: 'VALIDATION_ERROR', … } }`.
+- Every handler validates its payload (`assertSerial`, `assertHost`, `assertPort`, `assertPairCode`, `assertLogcatOptions`, `assertScrcpyOptions`, `assertAvdName`, …) before any logic runs; failures come back as `{ ok: false, error: { code: 'VALIDATION_ERROR', … } }`.
 - Hostnames accept IPv4 (octet-checked), IPv6 and DNS labels — and reject anything containing whitespace, control characters or shell metacharacters.
 
 ## Guarantee 6 — bounded resource use
 
 - Every one-shot command has a timeout and output cap; logcat batches lines (200 / 250 ms) and caps concurrent sessions at 4.
-- `ProcessRegistry` tracks every long-lived child and stops all of them (SIGTERM → SIGKILL) on quit — no orphaned `adb logcat` or `scrcpy`.
+- `ProcessRegistry` tracks every long-lived child and stops all of them (SIGTERM → SIGKILL) on quit — no orphaned `adb logcat`, `scrcpy` or emulator.
 - The renderer log buffer is bounded (5 000 lines) and export payloads are size-checked (`assertLogLineBatch`).
 
 ## What DroidBridge deliberately does NOT do

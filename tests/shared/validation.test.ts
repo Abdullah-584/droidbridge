@@ -9,6 +9,7 @@ import {
   assertPort,
   assertProjectPath,
   assertScrcpyOptions,
+  assertAvdName,
   assertSerial,
   assertSessionId,
   isValidIpv4,
@@ -143,6 +144,30 @@ describe('isValidHost', () => {
   it('rejects values with control characters', () => {
     expect(isValidHost('192.168.1.1\n')).toBe(false);
     expect(isValidHost('host\u0007')).toBe(false);
+  });
+});
+
+describe('assertAvdName', () => {
+  it('accepts typical AVD names', () => {
+    expect(assertAvdName('Pixel_7_API_34')).toBe('Pixel_7_API_34');
+    expect(assertAvdName('pixel_5_api_33')).toBe('pixel_5_api_33');
+    expect(assertAvdName('My AVD 2')).toBe('My AVD 2');
+    expect(assertAvdName('test.avd-1')).toBe('test.avd-1');
+  });
+
+  it('rejects names that could never come from emulator -list-avds', () => {
+    expect(() => assertAvdName('')).toThrow(ValidationError);
+    expect(() => assertAvdName(' lead')).toThrow(ValidationError);
+    expect(() => assertAvdName('trail ')).toThrow(ValidationError);
+    expect(() => assertAvdName('-list-avds')).toThrow(ValidationError);
+    expect(() => assertAvdName('..')).toThrow(ValidationError);
+    expect(() => assertAvdName('../escape')).toThrow(ValidationError);
+    expect(() => assertAvdName('a/b')).toThrow(ValidationError);
+    expect(() => assertAvdName('a\\b')).toThrow(ValidationError);
+    expect(() => assertAvdName('x'.repeat(65))).toThrow(ValidationError);
+    expect(() => assertAvdName('a\u0000b')).toThrow(ValidationError);
+    expect(() => assertAvdName(42)).toThrow(ValidationError);
+    expect(() => assertAvdName(undefined)).toThrow(ValidationError);
   });
 });
 

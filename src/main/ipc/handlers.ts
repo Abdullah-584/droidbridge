@@ -7,6 +7,7 @@ import {
   assertPairCode,
   assertPort,
   assertProjectPath,
+  assertAvdName,
   assertScrcpyOptions,
   assertSerial,
   assertSessionId,
@@ -14,6 +15,7 @@ import {
 } from '../../shared/validation';
 import { runAdb } from '../adb/adb';
 import type { LogcatManager } from '../adb/logcat';
+import type { EmulatorManager } from '../services/emulator';
 import type { ScrcpyManager } from '../services/scrcpy';
 import { disconnectDevice, getDeviceDetails, listDevices, rebootDevice, runDiagnostics } from '../services/devices';
 import { connectWireless, disconnectWireless, pairWireless, restartAdbServer } from '../services/pairing';
@@ -31,6 +33,7 @@ import type { BrowserWindow } from 'electron';
 export interface HandlerDeps {
   logcat: LogcatManager;
   scrcpy: ScrcpyManager;
+  emulator: EmulatorManager;
   appVersion: string;
   platform: string;
   getWindow: () => BrowserWindow | undefined;
@@ -182,6 +185,14 @@ export function createHandlerSpecs(deps: HandlerDeps): HandlerSpecs {
         deps.scrcpy.stop(sessionId);
         return null;
       },
+    },
+    'emulator:list': {
+      validate: noArgs,
+      handle: async () => ({ avds: await deps.emulator.list() }),
+    },
+    'emulator:start': {
+      validate: (raw) => ({ avd: assertAvdName(asRecord(raw).avd) }),
+      handle: async ({ avd }) => ({ sessionId: await deps.emulator.start(avd) }),
     },
     'update:install': {
       validate: noArgs,

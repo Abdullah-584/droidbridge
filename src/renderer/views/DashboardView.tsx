@@ -3,6 +3,7 @@ import type { SystemStatus, ToolInfo } from '../../shared/types';
 import type { DevicesApi } from '../hooks/useDevices';
 import type { useSystemStatus } from '../hooks/useSystemStatus';
 import { Card, EmptyState, StatusPill } from '../components/ui';
+import { EmulatorLauncher } from '../components/EmulatorLauncher';
 import { IconDevice, IconExternal, IconShield } from '../components/icons';
 import { deviceStateMeta, transportLabel } from '../lib/format';
 import type { ViewId } from '../components/Sidebar';
@@ -127,6 +128,10 @@ export function DashboardView({ devices, system, onSelectDevice, onNavigate }: P
                 Flutter &amp; VS Code <span className="ml-1 text-xs text-muted">Doctor, devices, projects</span>
               </button>
             </div>
+          </Card>
+
+          <Card title="Emulator" description="Boot an Android Virtual Device — it connects over ADB automatically">
+            <EmulatorLauncher />
           </Card>
 
           <Card title="ADB server" description="Restart clears stale device state">

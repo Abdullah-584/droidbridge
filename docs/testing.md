@@ -8,9 +8,10 @@ Runner: **Vitest** (`npm test`, config in `vitest.config.ts`). Layers follow the
 
 | File | Covers |
 | --- | --- |
-| `tests/shared/validation.test.ts` | Every boundary validator: serials, hosts (IPv4/IPv6/hostname, injection shapes), ports, pairing codes, project paths, external URLs, logcat/scrcpy options |
+| `tests/shared/validation.test.ts` | Every boundary validator: serials, AVD names, hosts (IPv4/IPv6/hostname, injection shapes), ports, pairing codes, project paths, external URLs, logcat/scrcpy options |
 | `tests/main/adb-parse.test.ts` | Real `adb devices -l`, `getprop`, `dumpsys battery`, `df -k`, `/proc/meminfo`, `ip addr`, `logcat -v threadtime`, `flutter devices` output fixtures |
-| `tests/main/adb-locate.test.ts` | Tool location priority (override → SDK env → PATH → winget package scan → default locations) with injected file probes |
+| `tests/main/adb-locate.test.ts` | Tool location priority (override → SDK env → PATH → winget package scan → default locations) with injected file probes — adb, Flutter, scrcpy, VS Code and the emulator |
+| `tests/main/emulator.test.ts` | AVD list parsing (CRLF, noise, dedup, cap), start-argv construction, and the `EmulatorManager` lifecycle against fake children: registry tracking, exit reporting, spawn-error de-duplication, bounded failure output |
 | `tests/main/ipc-registry.test.ts` | Result envelope, error normalization, complete channel registration, per-channel payload validation |
 
 ### 2. Process-safety tests (node, real processes)
@@ -38,6 +39,7 @@ These are the tests that prove "real ADB only". They intentionally pass with zer
 | --- | --- |
 | `tests/renderer/format.test.ts` | Log filtering (level + regex/substring fallback, combined), state/level styling maps, duration/time formatting |
 | `tests/renderer/ui.test.tsx` | Primitives (Button/StatusPill/EmptyState/Field), Sidebar navigation, **PairingView validation UX** (invalid port / missing host never reach IPC) with a stubbed bridge |
+| `tests/renderer/emulator-launcher.test.tsx` | Dashboard **EmulatorLauncher**: single-AVD auto-start, AVD chooser, honest errors (emulator missing / no AVDs / start failure), `emulator:exit` handling (failed boot surfaces `PANIC`, clean exit returns to idle, foreign sessions ignored) |
 
 ## Running
 

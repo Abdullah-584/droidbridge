@@ -47,6 +47,32 @@ export function assertSerial(raw: unknown): string {
   return raw;
 }
 
+/**
+ * AVD names as produced by `emulator -list-avds`: a leading alphanumeric
+ * character, then letters/digits/`.`/`_`/`-`/spaces, 1–64 chars total.
+ * The leading-character rule rejects flag-shaped values (`-list-avds`) and
+ * path-shaped values (`..`, `../evil`); spaces are allowed because Android
+ * Studio ships defaults like `Pixel 7 API 34`.
+ */
+const AVD_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._\- ]{0,63}$/;
+
+/** True for an AVD name DroidBridge will pass to `emulator -avd`. */
+export function isValidAvdName(value: string): boolean {
+  return AVD_NAME_RE.test(value) && value.trim() === value;
+}
+
+/**
+ * Validates an AVD name crossing the IPC boundary. The name becomes a single
+ * argv entry to `emulator -avd <name>` (never a shell string), but it is still
+ * constrained so flag-shaped or path-shaped values can never be injected.
+ */
+export function assertAvdName(raw: unknown): string {
+  if (typeof raw !== 'string' || !isValidAvdName(raw)) {
+    throw new ValidationError('Invalid AVD name.');
+  }
+  return raw;
+}
+
 /** Returns true when the string is a valid IPv4 address (each octet ≤ 255). */
 export function isValidIpv4(value: string): boolean {
   const m = IPV4_RE.exec(value);

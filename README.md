@@ -10,7 +10,7 @@ Everything you see is real: DroidBridge shells out to the actual `adb`, `flutter
 
 | Area | What you get |
 | --- | --- |
-| **Dashboard** | Live device list, toolchain health (adb / Flutter / scrcpy / VS Code with paths + versions), quick actions, ADB server restart |
+| **Dashboard** | Live device list, toolchain health (adb / Flutter / scrcpy / VS Code with paths + versions), **start an Android emulator** (AVD picker), quick actions, ADB server restart |
 | **Devices** | Per-device inspector: identity props, battery, display, memory, storage, IPs, plus one-click **diagnostics** with pass/warn/fail checks and hints |
 | **Logcat** | Multi-buffer live streaming (`-v threadtime`, `-b main/system/crash/…`), level + search/regex filters, pause/resume, clear (`logcat -c`), export to a file you choose |
 | **Pairing** | Step-by-step **USB workflow** (developer options → USB debugging → authorize) and **wireless pairing** (`adb pair ip:port code`, `adb connect`, `adb disconnect`) |
@@ -25,7 +25,7 @@ Everything you see is real: DroidBridge shells out to the actual `adb`, `flutter
 - [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb` on `PATH` or in `%LOCALAPPDATA%\Android\Sdk\platform-tools`, or set `ANDROID_HOME`)
 - Optional: [Flutter SDK](https://docs.flutter.dev/get-started/install), [scrcpy](https://github.com/Genymobile/scrcpy) (`winget install Genymobile.scrcpy`), VS Code with the `code` CLI
 
-DroidBridge also honours these optional overrides: `DROIDBRIDGE_ADB_PATH`, `DROIDBRIDGE_FLUTTER_PATH`, `DROIDBRIDGE_SCRCPY_PATH`, `DROIDBRIDGE_VSCODE_PATH`.
+DroidBridge also honours these optional overrides: `DROIDBRIDGE_ADB_PATH`, `DROIDBRIDGE_FLUTTER_PATH`, `DROIDBRIDGE_SCRCPY_PATH`, `DROIDBRIDGE_VSCODE_PATH`, `DROIDBRIDGE_EMULATOR_PATH`.
 
 ## Install (prebuilt)
 
@@ -68,12 +68,12 @@ npm start          # run the built app (dist/) with Electron
 └───────────────────────────────▲──────────────────────────────────────────┘
 ┌───────────────────────────────▼──────────────────────────────────────────┐
 │ main: ipc/registry (validate → handle → Result envelope)                 │
-│   services/ (devices, pairing, tools, scrcpy, exporter)                  │
+│   services/ (devices, pairing, tools, scrcpy, emulator, exporter)        │
 │   adb/ (locate, run: spawn without shell, parse, logcat streaming)       │
 │   process/registry (tracks + kills every child process on quit)          │
 └───────────────────────────────▲──────────────────────────────────────────┘
                                 │ spawn(bin, argv, { shell: false })
-                        adb.exe / flutter.bat / scrcpy.exe / code.cmd
+                        adb.exe / flutter.bat / scrcpy.exe / code.cmd / emulator.exe
 ```
 
 The full contract lives in [`src/shared/types.ts`](src/shared/types.ts) (one `IpcInvokeMap` shared by both sides) — see [docs/architecture.md](docs/architecture.md).
