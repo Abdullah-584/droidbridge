@@ -148,3 +148,83 @@ export const IconCopy = (p: IconProps) =>
       <path d="M5 15H4a1 1 0 0 1-1-1V5a2 2 0 0 1 2-2h9a1 1 0 0 1 1 1v1" />
     </>
   ));
+
+export const IconSun = (p: IconProps) =>
+  base(p, (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19" />
+    </>
+  ));
+
+export const IconMoon = (p: IconProps) =>
+  base(p, <path d="M20 13.5A8.5 8.5 0 0 1 10.5 4a8.5 8.5 0 1 0 9.5 9.5z" />);
+
+export const IconUsb = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M12 21V5" />
+      <path d="M9.5 7.5L12 5l2.5 2.5" />
+      <path d="M12 13l3.5-2.5v-2M12 17l-3.5-2.5v-2" />
+      <rect x="10.7" y="2" width="2.6" height="2.6" rx="0.6" />
+      <rect x="16.5" y="7.2" width="2.6" height="2.6" rx="0.6" />
+      <rect x="4.9" y="11.2" width="2.6" height="2.6" rx="0.6" />
+    </>
+  ));
+
+export const IconWifi = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M3.5 9.5a13 13 0 0 1 17 0" />
+      <path d="M6.8 13a8.4 8.4 0 0 1 10.4 0" />
+      <path d="M10 16.4a3.7 3.7 0 0 1 4 0" />
+      <circle cx="12" cy="19.5" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ));
+
+export const IconEmulator = (p: IconProps) =>
+  base(p, (
+    <>
+      <rect x="3" y="4" width="18" height="13" rx="2.5" />
+      <path d="M8.5 20.5h7M12 17v3.5" />
+      <path d="M7.5 8.5l2.5 2-2.5 2" />
+      <line x1="12" y1="12.5" x2="15.5" y2="12.5" />
+    </>
+  ));
+
+export const IconCheck = (p: IconProps) => base(p, <path d="M4.5 12.5l5 5 10-11" />);
+
+export const IconArrowRight = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M4 12h15" />
+      <path d="M13.5 6.5L19 12l-5.5 5.5" />
+    </>
+  ));
+
+export const IconWarning = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M12 3.5l9 15.5H3z" />
+      <path d="M12 9.5v4.2" />
+      <circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ));
+
+export const IconClose = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </>
+  ));
+
+export const IconBridge = (p: IconProps) =>
+  base(p, (
+    <>
+      <path d="M4 8.5l2.6 7h10.8l2.6-7" />
+      <path d="M4 8.5h16" />
+      <path d="M8 15.5l1-3M16 15.5l-1-3M12 15.5v-3" />
+      <path d="M6.6 20h10.8" />
+    </>
+  ));

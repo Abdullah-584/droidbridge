@@ -82,15 +82,18 @@ export function PairingView({ devices }: Props) {
         description="Wired debugging, the reliable default"
         actions={<StatusPill tone={devices.devices.some((d) => d.transport === 'usb') ? 'ok' : 'idle'} label="USB" />}
       >
-        <ol className="space-y-3">
+        <ol className="space-y-0">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="flex gap-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-[11px] font-bold text-cyan-200">
+            <li key={step.title} className="relative flex gap-3 pb-4 last:pb-0">
+              {index < STEPS.length - 1 && (
+                <span className="absolute top-7 left-[11px] h-[calc(100%-16px)] w-px bg-line" aria-hidden />
+              )}
+              <span className="relative flex size-[23px] shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-[10.5px] font-semibold text-accent tabular-nums">
                 {index + 1}
               </span>
-              <div>
-                <p className="text-sm font-medium text-ink">{step.title}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">{step.body}</p>
+              <div className="pt-0.5">
+                <p className="text-[12.5px] font-medium text-ink">{step.title}</p>
+                <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted">{step.body}</p>
               </div>
             </li>
           ))}
@@ -129,8 +132,8 @@ export function PairingView({ devices }: Props) {
               const meta = deviceStateMeta(device.state);
               return (
                 <li key={device.serial} className="flex items-center justify-between gap-3 py-2">
-                  <span className="truncate font-mono text-xs text-slate-300">{device.serial}</span>
-                  <span className={`shrink-0 text-xs ${meta.text}`}>{meta.label}</span>
+                  <span className="truncate font-mono text-[11.5px] text-ink-2">{device.serial}</span>
+                  <span className={`shrink-0 text-[11px] ${meta.text}`}>{meta.label}</span>
                 </li>
               );
             })}
@@ -142,11 +145,11 @@ export function PairingView({ devices }: Props) {
         <Card
           title="Wireless pairing"
           description="Android 11+ wireless debugging on the same Wi-Fi network"
-          actions={<IconLink className="text-cyan-300" />}
+          actions={<IconLink className="text-accent" size={15} />}
         >
-          <div className="mb-4 rounded-lg border border-line/70 bg-panel-2/50 px-4 py-3 text-xs leading-relaxed text-muted">
-            On the device: Settings → Developer options → <strong className="text-slate-300">Wireless debugging</strong> →
-            “Pair device with pairing code”. Enter the <strong className="text-slate-300">IP:port</strong> and the
+          <div className="mb-4 rounded-[10px] border border-line bg-surface-2/60 px-4 py-3 text-[11.5px] leading-relaxed text-muted">
+            On the device: Settings → Developer options → <strong className="text-ink-2">Wireless debugging</strong> →
+            “Pair device with pairing code”. Enter the <strong className="text-ink-2">IP:port</strong> and the
             six-digit pairing code shown there below. The device and this PC must be on the same network.
           </div>
 
@@ -204,10 +207,10 @@ export function PairingView({ devices }: Props) {
 
           {message && (
             <p
-              className={`mt-4 rounded-md border px-3 py-2 text-xs ${
+              className={`mt-4 rounded-[8px] border px-3 py-2 text-[11.5px] ${
                 message.tone === 'ok'
-                  ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-                  : 'border-rose-400/30 bg-rose-400/10 text-rose-200'
+                  ? 'border-ok/25 bg-ok/[0.07] text-ok'
+                  : 'border-err/25 bg-err/[0.07] text-err'
               }`}
             >
               {message.text}
@@ -220,7 +223,7 @@ export function PairingView({ devices }: Props) {
           description="Connected over TCP — disconnect any time"
         >
           {wireDevices.length === 0 ? (
-            <p className="text-xs text-muted">No wireless devices connected right now.</p>
+            <p className="text-[11.5px] text-muted">No wireless devices connected right now.</p>
           ) : (
             <ul className="divide-y divide-line/60">
               {wireDevices.map((device) => {
@@ -229,7 +232,7 @@ export function PairingView({ devices }: Props) {
                 return (
                   <li key={device.serial} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate font-mono text-sm text-ink">{device.model ?? device.serial}</p>
+                      <p className="truncate font-mono text-[12px] text-ink">{device.model ?? device.serial}</p>
                       <p className={`text-[11px] ${meta.text}`}>
                         {meta.label} · {device.ip}:{device.port}
                       </p>
@@ -253,12 +256,12 @@ export function PairingView({ devices }: Props) {
           )}
         </Card>
 
-        <Card title="Troubleshooting" actions={<IconShield className="text-cyan-300" />}>
-          <ul className="space-y-2.5 text-xs leading-relaxed text-muted">
+        <Card title="Troubleshooting" actions={<IconShield className="text-accent" size={14} />}>
+          <ul className="space-y-2.5 text-[11.5px] leading-relaxed text-muted">
             <li>
               <button
                 type="button"
-                className="text-cyan-300 hover:text-cyan-200"
+                className="text-accent transition-colors duration-[var(--t-1)] hover:brightness-125"
                 onClick={() => void call('system:open-external', { url: 'https://developer.android.com/tools/adb' })}
               >
                 ADB over Wi-Fi documentation <IconExternal size={11} className="inline" />
@@ -268,8 +271,8 @@ export function PairingView({ devices }: Props) {
               Pairing codes expire in a few seconds — keep the pairing dialog open on the device and retry quickly.
             </li>
             <li>
-              “adb connect” uses the <span className="font-mono text-slate-300">Connect to port</span> from wireless
-              debugging; “Pair” uses the separate <span className="font-mono text-slate-300">Pair with code</span> port.
+              “adb connect” uses the <span className="font-mono text-ink-2">Connect to port</span> from wireless
+              debugging; “Pair” uses the separate <span className="font-mono text-ink-2">Pair with code</span> port.
             </li>
             <li>If the device shows offline, restart the ADB server (USB tab) and reconnect.</li>
             <li>Some corporate/VPN networks block device-to-PC traffic; use the same plain Wi-Fi network.</li>

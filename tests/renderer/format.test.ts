@@ -62,10 +62,17 @@ describe('presentation helpers', () => {
   });
 
   it('styles diagnostics and levels', () => {
-    expect(diagnosticStyle('pass')).toContain('emerald');
-    expect(diagnosticStyle('fail')).toContain('rose');
-    expect(logLevelClass('error')).toContain('rose');
-    expect(logLevelClass(null)).toContain('slate');
+    // Semantic design tokens (Precision in Motion): each status/level maps to
+    // its own token and never shares another's tone.
+    expect(diagnosticStyle('pass')).toContain('text-ok');
+    expect(diagnosticStyle('warn')).toContain('text-warn');
+    expect(diagnosticStyle('fail')).toContain('text-err');
+    expect(diagnosticStyle('info')).toContain('text-info');
+    expect(logLevelClass('error')).toContain('text-err');
+    expect(logLevelClass('warn')).toContain('text-warn');
+    expect(logLevelClass('info')).toContain('text-ok');
+    expect(logLevelClass(null)).toContain('text-dim');
+    expect(diagnosticStyle('pass')).not.toContain('err');
   });
 
   it('formats durations and relative time', () => {
@@ -77,8 +84,8 @@ describe('presentation helpers', () => {
   });
 
   it('tones battery percentages', () => {
-    expect(batteryTone(80)).toContain('emerald');
-    expect(batteryTone(25)).toContain('amber');
-    expect(batteryTone(5)).toContain('rose');
+    expect(batteryTone(80)).toBe('text-ok');
+    expect(batteryTone(25)).toBe('text-warn');
+    expect(batteryTone(5)).toBe('text-err');
   });
 });

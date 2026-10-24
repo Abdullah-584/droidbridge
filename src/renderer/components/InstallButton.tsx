@@ -77,7 +77,7 @@ export function InstallButton({ tool, label, onInstalled, className = '' }: Inst
         {text}
       </Button>
       {error && (
-        <p role="alert" className="max-w-64 text-[11px] leading-snug text-rose-300">
+        <p role="alert" className="max-w-64 text-[11px] leading-snug text-err">
           {error}
         </p>
       )}

@@ -8,15 +8,15 @@ export interface Tone {
 }
 
 const STATE_META: Record<DeviceState, Tone> = {
-  device: { dot: 'bg-emerald-400', text: 'text-emerald-300', label: 'Connected' },
-  unauthorized: { dot: 'bg-amber-400', text: 'text-amber-300', label: 'Unauthorized' },
-  authorizing: { dot: 'bg-amber-400', text: 'text-amber-300', label: 'Authorizing' },
-  offline: { dot: 'bg-rose-400', text: 'text-rose-300', label: 'Offline' },
-  'no-permissions': { dot: 'bg-rose-400', text: 'text-rose-300', label: 'No permissions' },
-  recovery: { dot: 'bg-sky-400', text: 'text-sky-300', label: 'Recovery' },
-  sideload: { dot: 'bg-sky-400', text: 'text-sky-300', label: 'Sideload' },
-  rescue: { dot: 'bg-sky-400', text: 'text-sky-300', label: 'Rescue' },
-  unknown: { dot: 'bg-slate-400', text: 'text-slate-300', label: 'Unknown' },
+  device: { dot: 'bg-ok', text: 'text-ok', label: 'Connected' },
+  unauthorized: { dot: 'bg-warn', text: 'text-warn', label: 'Unauthorized' },
+  authorizing: { dot: 'bg-warn', text: 'text-warn', label: 'Authorizing' },
+  offline: { dot: 'bg-err', text: 'text-err', label: 'Offline' },
+  'no-permissions': { dot: 'bg-err', text: 'text-err', label: 'No permissions' },
+  recovery: { dot: 'bg-info', text: 'text-info', label: 'Recovery' },
+  sideload: { dot: 'bg-info', text: 'text-info', label: 'Sideload' },
+  rescue: { dot: 'bg-info', text: 'text-info', label: 'Rescue' },
+  unknown: { dot: 'bg-dim', text: 'text-muted', label: 'Unknown' },
 };
 
 export function deviceStateMeta(state: DeviceState): Tone {
@@ -37,10 +37,10 @@ export function transportLabel(transport: string): string {
 }
 
 const DIAGNOSTIC_STYLES: Record<DiagnosticStatus, string> = {
-  pass: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/30',
-  warn: 'text-amber-300 bg-amber-400/10 border-amber-400/30',
-  fail: 'text-rose-300 bg-rose-400/10 border-rose-400/30',
-  info: 'text-sky-300 bg-sky-400/10 border-sky-400/30',
+  pass: 'text-ok bg-ok/10 border-ok/25',
+  warn: 'text-warn bg-warn/10 border-warn/25',
+  fail: 'text-err bg-err/10 border-err/25',
+  info: 'text-info bg-info/10 border-info/25',
 };
 
 export function diagnosticStyle(status: DiagnosticStatus): string {
@@ -48,16 +48,16 @@ export function diagnosticStyle(status: DiagnosticStatus): string {
 }
 
 export const LOG_LEVEL_CLASS: Record<string, string> = {
-  verbose: 'text-slate-400',
-  debug: 'text-sky-300',
-  info: 'text-emerald-300',
-  warn: 'text-amber-300',
-  error: 'text-rose-300',
-  fatal: 'text-rose-400 font-semibold',
+  verbose: 'text-dim',
+  debug: 'text-info',
+  info: 'text-ok',
+  warn: 'text-warn',
+  error: 'text-err',
+  fatal: 'text-err font-semibold',
 };
 
 export function logLevelClass(level: string | null): string {
-  return (level && LOG_LEVEL_CLASS[level]) || 'text-slate-400';
+  return (level && LOG_LEVEL_CLASS[level]) || 'text-dim';
 }
 
 /**
@@ -102,7 +102,7 @@ export function timeAgo(iso: string): string {
 }
 
 export function batteryTone(level: number): string {
-  if (level >= 40) return 'text-emerald-300';
-  if (level >= 20) return 'text-amber-300';
-  return 'text-rose-300';
+  if (level >= 40) return 'text-ok';
+  if (level >= 20) return 'text-warn';
+  return 'text-err';
 }

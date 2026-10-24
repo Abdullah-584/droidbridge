@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Matches the app surface so the window never flashes white before CSS loads -->
+    <style>
+      html { background: #0b0e13; }
+      @media (prefers-color-scheme: light) { html:has(.theme-light) { background: #f1f3f6; } }
+    </style>
     <title>DroidBridge</title>
   </head>
   <body>

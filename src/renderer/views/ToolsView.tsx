@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AdbDevice, CommandResult, SystemStatus } from '../../shared/types';
 import type { useSystemStatus } from '../hooks/useSystemStatus';
-import { Button, Card, EmptyState, Field, StatusPill, inputClass } from '../components/ui';
+import { Button, Card, EmptyState, Field, StatusPill, Toggle, inputClass } from '../components/ui';
 import { InstallButton } from '../components/InstallButton';
 import { IconExternal, IconFolder, IconPlay, IconStop } from '../components/icons';
 import { call } from '../lib/api';
@@ -22,17 +22,17 @@ function OutputPanel({ result, empty }: { result: CommandResult | null; empty: s
         <span
           className={`rounded-full border px-2 py-0.5 font-semibold uppercase tracking-wide ${
             result.code === 0
-              ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
-              : 'border-rose-400/30 bg-rose-400/10 text-rose-300'
+              ? 'border-ok/25 bg-ok/10 text-ok'
+              : 'border-err/25 bg-err/10 text-err'
           }`}
         >
           exit {result.code ?? 'n/a'}
         </span>
         <span className="text-muted">{(result.durationMs / 1000).toFixed(1)}s</span>
-        {result.timedOut && <span className="text-amber-300">timed out</span>}
-        {result.truncated && <span className="text-amber-300">output truncated</span>}
+        {result.timedOut && <span className="text-warn">timed out</span>}
+        {result.truncated && <span className="text-warn">output truncated</span>}
       </div>
-      <pre className="max-h-80 overflow-auto rounded-lg bg-[#080d18] p-4 font-mono text-[11.5px] leading-5 whitespace-pre-wrap text-slate-300">
+      <pre className="recessed max-h-80 overflow-auto p-4 font-mono text-[11.5px] leading-5 whitespace-pre-wrap text-ink-2">
         {text}
       </pre>
     </div>
@@ -109,8 +109,7 @@ export function ToolsView({ system, devices }: Props) {
             )}
           </div>
         }
-      >
-        <p className="font-mono text-[11px] text-muted">{status?.flutter.version ?? status?.flutter.hint ?? 'Probing…'}</p>
+      >          <p className="font-mono text-[10.5px] text-dim">{status?.flutter.version ?? status?.flutter.hint ?? 'Probing…'}</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -147,8 +146,8 @@ export function ToolsView({ system, devices }: Props) {
           <ul className="mt-3 divide-y divide-line/60 rounded-lg border border-line/60">
             {flutterDevices.map((device) => (
               <li key={device.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <span className="text-xs text-ink">{device.name}</span>
-                <span className="font-mono text-[11px] text-muted">{device.targetType}</span>
+                <span className="text-[11.5px] text-ink">{device.name}</span>
+                <span className="font-mono text-[10.5px] text-muted">{device.targetType}</span>
               </li>
             ))}
           </ul>
@@ -209,7 +208,7 @@ export function ToolsView({ system, devices }: Props) {
               </div>
             }
           >
-          <p className="font-mono text-[11px] text-muted">{status?.vscode.version ?? status?.vscode.hint ?? 'Probing…'}</p>
+          <p className="font-mono text-[10.5px] text-dim">{status?.vscode.version ?? status?.vscode.hint ?? 'Probing…'}</p>
 
           <div className="mt-4 flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1">
@@ -238,9 +237,9 @@ export function ToolsView({ system, devices }: Props) {
             </Button>
           </div>
 
-          <p className="mt-4 text-xs leading-relaxed text-muted">
+          <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
             Want launch configs for on-device debugging? Use the Flutter extension inside VS Code, or run
-            <span className="font-mono text-slate-300"> flutter run </span> in the integrated terminal — DroidBridge
+            <span className="font-mono text-ink-2"> flutter run </span> in the integrated terminal — DroidBridge
             keeps your project files untouched.
           </p>
         </Card>
@@ -298,7 +297,7 @@ export function ToolsView({ system, devices }: Props) {
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-300">
+              <div className="mt-3 flex flex-wrap gap-4">
                 {(
                   [
                     ['noAudio', 'No audio'],
@@ -306,14 +305,12 @@ export function ToolsView({ system, devices }: Props) {
                     ['alwaysOnTop', 'Always on top'],
                   ] as const
                 ).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={scrcpy[key]}
-                      onChange={(e) => setScrcpy((s) => ({ ...s, [key]: e.target.checked }))}
-                    />
-                    {label}
-                  </label>
+                  <Toggle
+                    key={key}
+                    label={label}
+                    checked={scrcpy[key]}
+                    onChange={(next) => setScrcpy((s) => ({ ...s, [key]: next }))}
+                  />
                 ))}
               </div>
 
@@ -337,20 +334,19 @@ export function ToolsView({ system, devices }: Props) {
                 )}
                 <span className="text-[11px] text-muted">
                   {scrcpySession ? 'Mirroring — the window is controlled by scrcpy itself.' : 'Launches the real scrcpy binary.'}
-                </span>
-              </div>
+                </span>              </div>
             </>
           )}
         </Card>
       </div>
 
       {error && (
-        <p className="xl:col-span-2 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-200">
+        <p className="xl:col-span-2 rounded-[8px] border border-err/25 bg-err/[0.07] px-3 py-2 text-[11.5px] text-err">
           {error}
         </p>
       )}
       {notice && (
-        <p className="xl:col-span-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200">
+        <p className="xl:col-span-2 rounded-[8px] border border-accent/25 bg-accent/[0.07] px-3 py-2 text-[11.5px] text-accent">
           {notice}
         </p>
       )}

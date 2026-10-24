@@ -175,10 +175,10 @@ export function LogcatView({ devices, initialSerial }: Props) {
                         prev.includes(buffer) ? prev.filter((b) => b !== buffer) : [...prev, buffer],
                       )
                     }
-                    className={`rounded-md border px-2 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                    className={`rounded-[7px] border px-2 py-1 text-[11px] transition-colors duration-[var(--t-1)] disabled:opacity-50 ${
                       active
-                        ? 'border-cyan-400/50 bg-cyan-400/15 text-cyan-200'
-                        : 'border-line bg-white/[0.03] text-slate-400 hover:bg-white/[0.07]'
+                        ? 'border-accent/45 bg-accent/12 text-accent'
+                        : 'border-line bg-surface-2 text-muted hover:bg-surface-3 hover:text-ink-2'
                     }`}
                   >
                     {buffer}
@@ -200,7 +200,7 @@ export function LogcatView({ devices, initialSerial }: Props) {
 
           <Field label="Search" hint="Plain text or /regex/">
             <div className="relative">
-              <IconSearch size={14} className="pointer-events-none absolute left-3 top-2.5 text-slate-500" />
+              <IconSearch size={14} className="pointer-events-none absolute left-3 top-2.5 text-dim" />
               <input
                 className={`${inputClass} pl-9`}
                 placeholder="tag, message, pid…"
@@ -214,13 +214,13 @@ export function LogcatView({ devices, initialSerial }: Props) {
         {(error || notice || logcat.exitInfo) && (
           <div className="mt-4 space-y-2">
             {error && (
-              <p className="rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-200">{error}</p>
+              <p className="rounded-[8px] border border-err/25 bg-err/[0.07] px-3 py-2 text-[11.5px] text-err">{error}</p>
             )}
             {notice && (
-              <p className="rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200">{notice}</p>
+              <p className="rounded-[8px] border border-accent/25 bg-accent/[0.07] px-3 py-2 text-[11.5px] text-accent">{notice}</p>
             )}
             {logcat.exitInfo && !logcat.running && (
-              <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+              <p className="rounded-[8px] border border-warn/25 bg-warn/[0.07] px-3 py-2 text-[11.5px] text-warn">
                 Session ended (code {logcat.exitInfo.code ?? 'n/a'}
                 {logcat.exitInfo.error ? `: ${logcat.exitInfo.error}` : ''}).
               </p>
@@ -250,11 +250,11 @@ export function LogcatView({ devices, initialSerial }: Props) {
           </div>
         }
       >
-        <div className="h-[calc(100vh-360px)] min-h-64 overflow-auto bg-[#080d18] font-mono text-[11.5px] leading-5">
+        <div className="recessed h-[calc(100vh-360px)] min-h-64 overflow-auto p-1 font-mono text-[11.5px] leading-5">
           {filtered.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6">
               <EmptyState
-                icon={<IconTerminal size={26} />}
+                icon={<IconTerminal size={18} />}
                 title={logcat.running ? 'Waiting for log output…' : 'No log lines'}
                 hint={
                   logcat.running
@@ -266,16 +266,21 @@ export function LogcatView({ devices, initialSerial }: Props) {
           ) : (
             <>
               {filtered.map((line) => (
-                <div key={line.seq} className="flex gap-3 px-4 py-px hover:bg-white/[0.04]">
-                  <span className="w-20 shrink-0 select-none text-slate-600">{line.time ?? ''}</span>
-                  <span className="w-12 shrink-0 select-none text-right text-slate-500">{line.pid ?? ''}</span>
-                  <span className={`w-10 shrink-0 uppercase select-none ${logLevelClass(line.level)}`}>
+                <div
+                  key={`${logcat.sessionId ?? 'idle'}:${line.seq}`}
+                  className="flex gap-3 rounded-[4px] px-3 py-px transition-colors duration-75 hover:bg-white/[0.04]"
+                >
+                  <span className="w-[118px] shrink-0 select-none whitespace-nowrap text-dim tabular-nums">
+                    {line.time ?? ''}
+                  </span>
+                  <span className="w-10 shrink-0 select-none text-right text-dim tabular-nums">{line.pid ?? ''}</span>
+                  <span className={`w-4 shrink-0 uppercase select-none ${logLevelClass(line.level)}`}>
                     {line.level ? line.level[0] : ''}
                   </span>
-                  <span className="w-44 shrink-0 truncate text-indigo-300" title={line.tag ?? ''}>
+                  <span className="w-40 shrink-0 truncate text-info/80" title={line.tag ?? ''}>
                     {line.tag ?? ''}
                   </span>
-                  <span className="min-w-0 whitespace-pre-wrap break-all text-slate-200">
+                  <span className="min-w-0 whitespace-pre-wrap break-all text-ink-2">
                     {line.message ?? line.raw}
                   </span>
                 </div>

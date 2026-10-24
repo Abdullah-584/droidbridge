@@ -77,14 +77,14 @@ export function EmulatorLauncher() {
     <div className="space-y-3">
       {phase === 'choosing' ? (
         <div className="space-y-2">
-          <p className="text-xs text-muted">Pick a virtual device to boot:</p>
-          <div className="flex flex-col gap-2">
+          <p className="text-[11.5px] text-muted">Pick a virtual device to boot:</p>
+          <div className="flex flex-col gap-1.5">
             {avds.map((avd) => (
               <button
                 key={avd}
                 type="button"
                 onClick={() => void startAvd(avd)}
-                className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-left font-mono text-sm text-slate-200 hover:bg-white/[0.07]"
+                className="rounded-[9px] border border-line bg-surface-2/60 px-3.5 py-2.5 text-left font-mono text-[12.5px] text-ink-2 transition-[background-color,border-color] duration-[var(--t-1)] ease-[var(--ease)] hover:border-line-strong hover:bg-surface-3 hover:text-ink"
               >
                 {avd}
               </button>
@@ -92,9 +92,15 @@ export function EmulatorLauncher() {
           </div>
         </div>
       ) : phase === 'starting' && picked ? (
-        <div>
-          <p className="font-mono text-sm text-slate-200">Starting {picked}…</p>
-          <p className="mt-0.5 text-xs text-muted">Booting can take a minute.</p>
+        <div className="flex items-center gap-2.5">
+          <span
+            className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="truncate font-mono text-[12.5px] text-ink">Starting {picked}…</p>
+            <p className="mt-0.5 text-[11px] text-muted">Booting can take a minute.</p>
+          </div>
         </div>
       ) : (
         <Button variant="primary" loading={phase === 'listing'} onClick={() => void launch()}>
@@ -103,7 +109,7 @@ export function EmulatorLauncher() {
       )}
 
       {message && (
-        <p role="alert" className="text-xs leading-relaxed text-rose-300">
+        <p role="alert" className="text-[11.5px] leading-relaxed text-err">
           {message}
         </p>
       )}
