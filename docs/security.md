@@ -64,13 +64,14 @@ Enforced in `src/main/index.ts` and `src/main/security.ts`:
 
 - No auto-acceptance or replay of adb authorization.
 - No `adb root`, `adb remount`, key regeneration or bootloader/recovery automation.
-- No telemetry, no network calls of its own (only `shell.openExternal` for documentation links the user clicks).
+- No telemetry; its own network calls are limited to the GitHub Releases update feed and the fixed official tool-download sources listed under supply chain below.
 - No arbitrary shell/terminal feature.
 
 ## Dependency & supply-chain notes
 
 - One lockfile (`package-lock.json`); the app ships zero runtime npm dependencies (React is bundled into the renderer by Vite; the asar contains only `dist/**` + `package.json`).
 - Dev-only toolchain: electron, electron-builder, vite, vitest, typescript, tailwind, testing-library. Review lockfile diffs on upgrade; keep `npm audit` triaged by reachability.
+- **Automatic tool installs** (`services/installer.ts`) download only from fixed official HTTPS sources: Google's platform-tools URL and the scrcpy GitHub release feed, whose response is parsed for a strictly patterned asset name (`scrcpy-win64-vX.Y.Z.zip`) — no URL is ever taken from user input or trusted verbatim from a response. Archives are extracted with the system bsdtar through the same no-shell `runCommand`, staged in a temp dir inside the per-user `%LOCALAPPDATA%\DroidBridge\tools`, and **verified by actually running the installed binary** before being swapped into place; failures surface as honest errors, never as silent partial installs. No admin rights are ever required. Flutter/VS Code installs run `winget` only on an explicit user click, with a fixed argv and an exact `--id` package match.
 
 ## Residual risks
 
@@ -79,3 +80,4 @@ Enforced in `src/main/index.ts` and `src/main/security.ts`:
 | A future batch wrapper (flutter.bat) internally expands `%1` unsafely | Mitigated: metacharacters never reach batch args |
 | Malicious device returning hostile logcat text | Rendered as text only (React escaping), never `innerHTML`; export writes plain text |
 | Future contributors adding a shell escape hatch | The spawn module is the single choke point; tests assert no-shell behavior |
+| Compromised tool download source | Mitigated: fixed official HTTPS URLs only, staged extraction, installed binary is executed and must exit 0 before the install is accepted |

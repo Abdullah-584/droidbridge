@@ -14,6 +14,7 @@ import type {
   LogcatLine,
   LogcatOptions,
   ScrcpyOptions,
+  ToolName,
 } from './types';
 import { LOGCAT_BUFFERS, LOGCAT_EXPORT_FORMATS, LOGCAT_LEVELS } from './types';
 
@@ -71,6 +72,20 @@ export function assertAvdName(raw: unknown): string {
     throw new ValidationError('Invalid AVD name.');
   }
   return raw;
+}
+
+/** The tools DroidBridge can install automatically (zip download or winget). */
+const INSTALLABLE_TOOLS = ['adb', 'flutter', 'scrcpy', 'code'] as const;
+
+/**
+ * Validates a tool-install request. The value is a closed enum — it can never
+ * become a path, a URL fragment or any other free-form input downstream.
+ */
+export function assertInstallTool(raw: unknown): ToolName {
+  if (typeof raw !== 'string' || !(INSTALLABLE_TOOLS as readonly string[]).includes(raw)) {
+    throw new ValidationError('Invalid tool name.');
+  }
+  return raw as ToolName;
 }
 
 /** Returns true when the string is a valid IPv4 address (each octet ≤ 255). */

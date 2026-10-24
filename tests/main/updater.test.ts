@@ -106,12 +106,14 @@ describe('createUpdater', () => {
     expect(fake.quitAndInstall).not.toHaveBeenCalled();
   });
 
-  it('installs once the update is downloaded', () => {
+  it('installs once the update is downloaded — silently, then relaunches', () => {
     const updater = createUpdater(fake, { isPackaged: true, emit });
     updater.start();
     fake.fire('update-downloaded', { version: '1.2.0' });
     updater.install();
+    // isSilent: no setup wizard; isForceRunAfter: app reopens on the new version.
     expect(fake.quitAndInstall).toHaveBeenCalledTimes(1);
+    expect(fake.quitAndInstall).toHaveBeenCalledWith(true, true);
   });
 
   it('surfaces a failed check as an error status instead of crashing', async () => {

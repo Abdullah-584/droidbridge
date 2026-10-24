@@ -4,6 +4,7 @@ import type { DevicesApi } from '../hooks/useDevices';
 import type { useSystemStatus } from '../hooks/useSystemStatus';
 import { Card, EmptyState, StatusPill } from '../components/ui';
 import { EmulatorLauncher } from '../components/EmulatorLauncher';
+import { InstallButton } from '../components/InstallButton';
 import { IconDevice, IconExternal, IconShield } from '../components/icons';
 import { deviceStateMeta, transportLabel } from '../lib/format';
 import type { ViewId } from '../components/Sidebar';
@@ -16,7 +17,7 @@ interface Props {
   onNavigate: (view: ViewId) => void;
 }
 
-function ToolRow({ info }: { info: ToolInfo }) {
+function ToolRow({ info, onInstalled }: { info: ToolInfo; onInstalled: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <div className="min-w-0">
@@ -25,7 +26,10 @@ function ToolRow({ info }: { info: ToolInfo }) {
           {info.available ? (info.version ?? info.path) : (info.hint ?? 'Not installed')}
         </p>
       </div>
-      <StatusPill tone={info.available ? 'ok' : 'warn'} label={info.available ? 'Ready' : 'Missing'} />
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <StatusPill tone={info.available ? 'ok' : 'warn'} label={info.available ? 'Ready' : 'Missing'} />
+        {!info.available && <InstallButton tool={info.tool} onInstalled={onInstalled} />}
+      </div>
     </div>
   );
 }
@@ -93,10 +97,10 @@ export function DashboardView({ devices, system, onSelectDevice, onNavigate }: P
         <Card title="Toolchain" description="Real binaries found on this machine">
           {status ? (
             <div className="divide-y divide-line/70">
-              <ToolRow info={status.adb} />
-              <ToolRow info={status.flutter} />
-              <ToolRow info={status.scrcpy} />
-              <ToolRow info={status.vscode} />
+              <ToolRow info={status.adb} onInstalled={() => void system.refresh()} />
+              <ToolRow info={status.flutter} onInstalled={() => void system.refresh()} />
+              <ToolRow info={status.scrcpy} onInstalled={() => void system.refresh()} />
+              <ToolRow info={status.vscode} onInstalled={() => void system.refresh()} />
             </div>
           ) : (
             <p className="text-sm text-muted">{system.loading ? 'Probing…' : (system.error ?? 'Unavailable')}</p>

@@ -10,14 +10,14 @@ Everything you see is real: DroidBridge shells out to the actual `adb`, `flutter
 
 | Area | What you get |
 | --- | --- |
-| **Dashboard** | Live device list, toolchain health (adb / Flutter / scrcpy / VS Code with paths + versions), **start an Android emulator** (AVD picker), quick actions, ADB server restart |
+| **Dashboard** | Live device list, toolchain health (adb / Flutter / scrcpy / VS Code with paths + versions), **auto-install of missing adb & scrcpy** (official zips, one click for the rest), **start an Android emulator** (AVD picker), quick actions, ADB server restart |
 | **Devices** | Per-device inspector: identity props, battery, display, memory, storage, IPs, plus one-click **diagnostics** with pass/warn/fail checks and hints |
 | **Logcat** | Multi-buffer live streaming (`-v threadtime`, `-b main/system/crash/…`), level + search/regex filters, pause/resume, clear (`logcat -c`), export to a file you choose |
 | **Pairing** | Step-by-step **USB workflow** (developer options → USB debugging → authorize) and **wireless pairing** (`adb pair ip:port code`, `adb connect`, `adb disconnect`) |
 | **Flutter** | SDK detection, `flutter doctor -v`, `flutter devices`, `flutter pub get` in a folder you pick (never modifies project files) |
 | **VS Code** | CLI detection, open any project folder with `code <dir>` |
 | **scrcpy** | Optional mirroring with fps/bitrate/audio/on-top/fullscreen options, launch & stop managed by DroidBridge |
-| **Auto-updates** | Installed builds check GitHub Releases at launch and every 4 h, download in the background, then **Restart now** (or install on quit) |
+| **Auto-updates** | Installed builds check GitHub Releases at launch and every 4 h, download in the background, then **Restart now** applies the update **silently — no setup wizard — and reopens the app** (or installs it on quit) |
 
 ## Screenshots
 
@@ -56,9 +56,9 @@ emulator attached).
 
 ## Requirements
 
-- Windows 10/11 x64
-- [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb` on `PATH` or in `%LOCALAPPDATA%\Android\Sdk\platform-tools`, or set `ANDROID_HOME`)
-- Optional: [Flutter SDK](https://docs.flutter.dev/get-started/install), [scrcpy](https://github.com/Genymobile/scrcpy) (`winget install Genymobile.scrcpy`), VS Code with the `code` CLI
+- Windows 10/11 x64 — that's it: **adb and scrcpy install automatically** on first launch (official Google / Genymobile downloads into `%LOCALAPPDATA%\DroidBridge\tools`, no admin rights) if they are missing.
+- Already have them? They are used as-is: `adb` on `PATH`, in `%LOCALAPPDATA%\Android\Sdk\platform-tools`, via `ANDROID_HOME`, or set `DROIDBRIDGE_ADB_PATH`.
+- Optional: [Flutter SDK](https://docs.flutter.dev/get-started/install) and VS Code — DroidBridge offers **one-click Install** buttons for both (silent `winget` installs; Flutter is multi-GB, so it never auto-downloads).
 
 DroidBridge also honours these optional overrides: `DROIDBRIDGE_ADB_PATH`, `DROIDBRIDGE_FLUTTER_PATH`, `DROIDBRIDGE_SCRCPY_PATH`, `DROIDBRIDGE_VSCODE_PATH`, `DROIDBRIDGE_EMULATOR_PATH`.
 
@@ -66,7 +66,7 @@ DroidBridge also honours these optional overrides: `DROIDBRIDGE_ADB_PATH`, `DROI
 
 Run `release\DroidBridge-Setup-1.0.0-x64.exe` — a per-user NSIS installer with Start Menu and Desktop shortcuts. No admin rights required.
 
-Installed copies stay current: DroidBridge checks the project's [GitHub Releases](https://github.com/Abdullah-584/droidbridge/releases) for a newer version, downloads it in the background and offers **Restart now** — and installs on quit either way.
+Installed copies stay current: DroidBridge checks the project's [GitHub Releases](https://github.com/Abdullah-584/droidbridge/releases) for a newer version, downloads it in the background and offers **Restart now** — the update then installs **silently in the background (no setup wizard)** and the new version reopens itself. Choosing **Later** installs it on quit.
 
 ## Develop
 
@@ -103,7 +103,7 @@ npm start          # run the built app (dist/) with Electron
 └───────────────────────────────▲──────────────────────────────────────────┘
 ┌───────────────────────────────▼──────────────────────────────────────────┐
 │ main: ipc/registry (validate → handle → Result envelope)                 │
-│   services/ (devices, pairing, tools, scrcpy, emulator, exporter)        │
+│   services/ (devices, pairing, tools, installer, scrcpy, emulator, …)   │
 │   adb/ (locate, run: spawn without shell, parse, logcat streaming)       │
 │   process/registry (tracks + kills every child process on quit)          │
 └───────────────────────────────▲──────────────────────────────────────────┘
@@ -120,6 +120,7 @@ The full contract lives in [`src/shared/types.ts`](src/shared/types.ts) (one `Ip
 - **Hardened renderer.** `contextIsolation`, `sandbox`, no Node integration, strict CSP, navigation and popup blocking, permission denial.
 - **Validated IPC.** Every invoke is schema-validated at the boundary; errors come back as structured results.
 - **No project writes.** Folders are opened, never modified; the only file DroidBridge writes is the log you explicitly export.
+- **Safe installs.** Auto-installed tools come only from fixed official HTTPS sources, are extracted without a shell, verified by running the installed binary, and live in a per-user directory — see [docs/security.md](docs/security.md).
 
 ## Documentation
 

@@ -10,6 +10,7 @@ import {
   assertProjectPath,
   assertScrcpyOptions,
   assertAvdName,
+  assertInstallTool,
   assertSerial,
   assertSessionId,
   isValidIpv4,
@@ -31,6 +32,24 @@ describe('assertSerial', () => {
     expect(() => assertSerial('a'.repeat(65))).toThrow(ValidationError);
     expect(() => assertSerial(42)).toThrow(ValidationError);
     expect(() => assertSerial(undefined)).toThrow(ValidationError);
+  });
+});
+
+describe('assertInstallTool', () => {
+  it('accepts the four installable tools', () => {
+    expect(assertInstallTool('adb')).toBe('adb');
+    expect(assertInstallTool('scrcpy')).toBe('scrcpy');
+    expect(assertInstallTool('flutter')).toBe('flutter');
+    expect(assertInstallTool('code')).toBe('code');
+  });
+
+  it('rejects anything outside the closed enum', () => {
+    expect(() => assertInstallTool('rm -rf')).toThrow(ValidationError);
+    expect(() => assertInstallTool('../../adb')).toThrow(ValidationError);
+    expect(() => assertInstallTool('')).toThrow(ValidationError);
+    expect(() => assertInstallTool('ADB')).toThrow(ValidationError);
+    expect(() => assertInstallTool(42)).toThrow(ValidationError);
+    expect(() => assertInstallTool(undefined)).toThrow(ValidationError);
   });
 });
 

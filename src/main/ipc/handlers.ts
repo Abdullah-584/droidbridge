@@ -11,6 +11,7 @@ import {
   assertScrcpyOptions,
   assertSerial,
   assertSessionId,
+  assertInstallTool,
   ValidationError,
 } from '../../shared/validation';
 import { runAdb } from '../adb/adb';
@@ -27,6 +28,7 @@ import {
   runFlutterPubGet,
 } from '../services/tools';
 import { exportLogcat } from '../services/exporter';
+import type { ToolInstaller } from '../services/installer';
 import type { HandlerSpecs } from './registry';
 import type { BrowserWindow } from 'electron';
 
@@ -41,6 +43,8 @@ export interface HandlerDeps {
   pickFolder: (title: string) => Promise<string | null>;
   /** Applies a downloaded update (quit → installer → relaunch). */
   installUpdate: () => void;
+  /** Automatic tool installation (adb/scrcpy zips, winget for flutter/code). */
+  installer: ToolInstaller;
 }
 
 function asRecord(raw: unknown): Record<string, unknown> {
@@ -193,6 +197,13 @@ export function createHandlerSpecs(deps: HandlerDeps): HandlerSpecs {
     'emulator:start': {
       validate: (raw) => ({ avd: assertAvdName(asRecord(raw).avd) }),
       handle: async ({ avd }) => ({ sessionId: await deps.emulator.start(avd) }),
+    },
+    'tools:install': {
+      validate: (raw) => ({ tool: assertInstallTool(asRecord(raw).tool) }),
+      handle: async ({ tool }) => {
+        await deps.installer.install(tool);
+        return null;
+      },
     },
     'update:install': {
       validate: noArgs,

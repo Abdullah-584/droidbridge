@@ -93,6 +93,14 @@ export function whichSync(candidateNames: readonly string[], pathValue: string |
   return null;
 }
 
+/**
+ * DroidBridge-managed tools root (`%LOCALAPPDATA%\DroidBridge\tools`) — where
+ * the automatic installer puts adb and scrcpy. Null without LOCALAPPDATA.
+ */
+export function managedToolsRoot(env: NodeJS.ProcessEnv): string | null {
+  return env.LOCALAPPDATA ? join(env.LOCALAPPDATA, 'DroidBridge', 'tools') : null;
+}
+
 function firstExisting(candidates: readonly string[], probe: FileProbe): string | null {
   for (const candidate of candidates) {
     if (candidate && probe.isFile(candidate)) return candidate;
@@ -147,6 +155,14 @@ export function findAdb(
 
   const fromPath = whichSync(windowsNames('adb'), env.PATH, probe);
   if (fromPath) return { path: fromPath, source: 'path' };
+
+  // DroidBridge's own automatic install (checked after the user's PATH so an
+  // explicitly installed SDK always wins).
+  const managedAdb = managedToolsRoot(env);
+  if (managedAdb) {
+    const fromManaged = firstExisting([join(managedAdb, 'platform-tools', windowsNames('adb')[0])], probe);
+    if (fromManaged) return { path: fromManaged, source: 'default-location' };
+  }
 
   const localAppData = env.LOCALAPPDATA;
   const defaults = [
@@ -239,6 +255,9 @@ export function findFlutter(env: NodeJS.ProcessEnv, probe: FileProbe): LocateRes
   const fromPath = whichSync(windowsNames('flutter'), env.PATH, probe);
   if (fromPath) return { path: fromPath, source: 'path' };
 
+  const fromWinget = findWingetFlutter(env.LOCALAPPDATA, probe);
+  if (fromWinget) return { path: fromWinget, source: 'default-location' };
+
   const home = env.USERPROFILE ?? env.HOME ?? '';
   const fromDefault = firstExisting(
     [join(home, 'flutter', 'bin', 'flutter'), join(home, 'flutter', 'bin', 'flutter.bat'), join('C:\\', 'flutter', 'bin', 'flutter.bat')],
@@ -287,6 +306,45 @@ export function findWingetScrcpy(localAppData: string | undefined, probe: FilePr
   return null;
 }
 
+/**
+ * Finds a winget-managed Flutter: the `%LOCALAPPDATA%\Microsoft\WinGet\Links`
+ * shim first, then the extracted package payload under `WinGet\Packages`
+ * (Google.Flutter_*). Mirrors the scrcpy winget scan so a just-finished
+ * install is detected without restarting the app for a stale PATH.
+ */
+export function findWingetFlutter(localAppData: string | undefined, probe: FileProbe): string | null {
+  if (!localAppData || !probe.listDir) return null;
+  if (probe.isFile(join(localAppData, 'Microsoft', 'WinGet', 'Links', 'flutter.bat'))) {
+    return join(localAppData, 'Microsoft', 'WinGet', 'Links', 'flutter.bat');
+  }
+  const packagesDir = join(localAppData, 'Microsoft', 'WinGet', 'Packages');
+  let packages: string[];
+  try {
+    packages = probe.listDir(packagesDir);
+  } catch {
+    return null;
+  }
+  for (const pkg of packages) {
+    if (!pkg.startsWith('Google.Flutter')) continue;
+    const pkgPath = join(packagesDir, pkg);
+    const direct = join(pkgPath, 'flutter', 'bin', 'flutter.bat');
+    if (probe.isFile(direct)) return direct;
+    let nested: string[];
+    try {
+      nested = probe.listDir(pkgPath);
+    } catch {
+      continue;
+    }
+    for (const dir of nested) {
+      const inExtracted = join(pkgPath, dir, 'flutter', 'bin', 'flutter.bat');
+      if (probe.isFile(inExtracted)) return inExtracted;
+      const flat = join(pkgPath, dir, 'bin', 'flutter.bat');
+      if (probe.isFile(flat)) return flat;
+    }
+  }
+  return null;
+}
+
 /** Finds scrcpy: override → PATH → winget packages → Program Files locations. */
 export function findScrcpy(env: NodeJS.ProcessEnv, probe: FileProbe): LocateResult {
   const override = env.DROIDBRIDGE_SCRCPY_PATH;
@@ -296,6 +354,14 @@ export function findScrcpy(env: NodeJS.ProcessEnv, probe: FileProbe): LocateResu
   if (fromPath) return { path: fromPath, source: 'path' };
 
   const localAppData = env.LOCALAPPDATA;
+
+  // DroidBridge's own automatic install (before the winget scan).
+  const managed = managedToolsRoot(env);
+  if (managed) {
+    const fromManaged = firstExisting([join(managed, 'scrcpy', windowsNames('scrcpy')[0])], probe);
+    if (fromManaged) return { path: fromManaged, source: 'default-location' };
+  }
+
   const fromWinget = findWingetScrcpy(localAppData, probe);
   if (fromWinget) return { path: fromWinget, source: 'default-location' };
 

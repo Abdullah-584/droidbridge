@@ -1,28 +1,93 @@
 name: Release
 
-# Two ways to cut a release:
-#   1. Tag push:   npm version patch && git push --follow-tags
-#   2. One click:  Actions → Release → Run workflow (bumps patch itself)
-# Both paths run the full quality gate, build the NSIS installer and publish
-# it to GitHub Releases with the update manifest (latest.yml + blockmap) that
-# installed clients poll for.
+# Three ways to cut a release:
+#   1. Auto:     push a CODE change to main → patch version is bumped in-run
+#                and the installer is published (docs/README-only pushes are
+#                filtered out by `paths` below).
+#   2. Tag push: npm version patch && git push --follow-tags
+#   3. One click: Actions → Release → Run workflow (bumps patch itself)
+# All paths run the full quality gate, build the NSIS installer, publish it to
+# GitHub Releases with the update manifest (latest.yml + blockmap) that
+# installed clients poll for, then verify the published release is complete.
+#
+# Note: pushes made with the built-in GITHUB_TOKEN (the in-run version bump and
+# electron-builder's tag push) never re-trigger workflows — GitHub's platform
+# rule against recursion. The `decide` job additionally guards the human
+# follow-tags flow so a branch run and its tag run never both publish.
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    # Code paths only: README/docs/LICENSE edits never burn a version.
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron-builder.yml'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'index.html'
   workflow_dispatch:
 
 # Creating/uploading a release needs write access for the default token.
 permissions:
-  contents: write
+contents: write
 
-# One release at a time; never cancel a half-uploaded release.
+# One release at a time; never cancel a half-uploaded release. This also
+# serializes queued runs, so post-publish checks see a settled state.
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
+  # Decides whether this run should publish. Skips are cheap and explicit:
+  #   - our own "release vX.Y.Z" bump commits (double-push safety)
+  #   - pushes whose HEAD commit is already tagged (the human
+  #     `git push --follow-tags` flow lets the tag run own that version).
+  #     A plain code push with an OLDER tag for the current version must
+  #     still publish — the tag has to point at THIS commit to skip.
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: decide
+        shell: bash
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message || '' }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          publish=true
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            if [[ "$HEAD_MESSAGE" == release\ v* ]]; then
+              publish=false
+              echo "Version-bump commit — nothing to release again."
+            else
+              version="$(node -p "require('./package.json').version")"
+              # Tags for this version whose target IS the pushed commit
+              # (annotated tags resolve through the peeled ^{} entry).
+              tags="$(git ls-remote --tags origin "refs/tags/v$version" "refs/tags/v$version^{}" || true)"
+              if [ -n "$tags" ] && printf '%s\n' "$tags" | grep -q "$HEAD_SHA"; then
+                publish=false
+                echo "v$version is already tagged at $HEAD_SHA — the tag run owns this version."
+              fi
+            fi
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Decision: publish=$publish (event=${{ github.event_name }}, ref=${{ github.ref }})"
+
   release:
+    needs: decide
+    if: needs.decide.outputs.publish == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +97,8 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Bump patch version (manual runs only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Bump patch version (manual runs and main pushes)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         shell: bash
         run: |
           npm version patch --no-git-tag-version
@@ -53,8 +118,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # CI=true makes the live install tests (real HTTPS downloads + tar
+      # extraction of adb/scrcpy) run here too — the auto-installer is gated
+      # on every release.
       - name: Quality gate (full test suite)
         run: npm test
+        env:
+          CI: 'true'
 
       # `dist` = typecheck + esbuild main/preload + Vite renderer + NSIS build.
       # --publish always uploads installer, blockmap and latest.yml to the
@@ -65,6 +135,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No signing certificate on CI: skip certificate discovery.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # electron-builder's parallel asset uploads can race the "release
+      # exists" check and split assets across two release objects (seen on
+      # v1.0.1). This step proves the release is single, complete and
+      # self-consistent — repairing a split duplicate when possible and
+      # failing the run loudly when not.
+      - name: Verify published release (duplicate guard)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/verify-release.mjs
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

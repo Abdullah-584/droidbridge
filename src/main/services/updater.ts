@@ -21,7 +21,11 @@ export interface UpdaterHandle {
   start(): void;
   /** Stops scheduled checks; call on app quit. */
   stop(): void;
-  /** Quits into the installer for a fully downloaded update; throws otherwise. */
+  /**
+   * Applies a fully downloaded update: quits, runs the installer silently in
+   * the background (no setup wizard) and relaunches the new version.
+   * Throws if nothing has been downloaded yet.
+   */
   install(): void;
 }
 
@@ -105,7 +109,9 @@ export function createUpdater(updater: UpdaterLike, options: UpdaterOptions): Up
       if (!isPackaged || downloadedVersion === null) {
         throw new ValidationError('No update has been downloaded yet.');
       }
-      updater.quitAndInstall();
+      // isSilent: the NSIS installer runs with /S (no wizard, no user input);
+      // isForceRunAfter: the new version relaunches immediately afterwards.
+      updater.quitAndInstall(true, true);
     },
   };
 }

@@ -30,7 +30,7 @@ export interface IpcInvokeMap {
 - **Preload** allow-lists channel names (`INVOKE_CHANNELS`, `EVENT_CHANNELS`) and refuses anything else before touching `ipcRenderer`.
 - **Renderer** calls `call('devices:list', null)` through `lib/api.ts`, which unwraps the envelope and throws a typed `ApiError` for the UI to display.
 
-Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit`, `emulator:exit` (batched and bounded — see `LogcatManager`) and `update:status` (a small `UpdateStatus` state object from the auto-updater).
+Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit`, `emulator:exit` (batched and bounded — see `LogcatManager`), `tools:install-progress` (live download/extract percent from the automatic tool installer) and `update:status` (a small `UpdateStatus` state object from the auto-updater).
 
 ## External process execution
 
@@ -47,7 +47,7 @@ Main → renderer events are `logcat:lines`, `logcat:exit`, `scrcpy:exit`, `emul
 1. Explicit override env (`DROIDBRIDGE_*_PATH`)
 2. SDK env vars (`ANDROID_HOME` / `ANDROID_SDK_ROOT`, `FLUTTER_ROOT`)
 3. `PATH` scan (`.exe`, `.cmd`, `.bat` variants)
-4. Well-known install locations — including a direct scan of winget's package store (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\Genymobile.scrcpy_*`), so `winget install Genymobile.scrcpy` is detected even before the updated PATH reaches a running process; plus `%LOCALAPPDATA%\Android\Sdk\platform-tools` and per-user VS Code
+4. Well-known install locations — including DroidBridge's own managed tools dir (`%LOCALAPPDATA%\DroidBridge\tools\platform-tools|scrcpy`, written by the automatic installer) and a direct scan of winget's package store (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\Genymobile.scrcpy_*`), so `winget install Genymobile.scrcpy` is detected even before the updated PATH reaches a running process; plus `%LOCALAPPDATA%\Android\Sdk\platform-tools` and per-user VS Code
 
 All lookups are pure functions over an injectable `FileProbe`, which is what makes them unit-testable.
 
@@ -61,8 +61,9 @@ The **emulator** resolves through `findEmulator()` with the same priority order,
 - `services/scrcpy.ts` — pure `buildScrcpyArgs` + managed launch/stop; missing scrcpy is an honest error with the winget command.
 - `services/emulator.ts` — AVD management: pure `parseAvdList` (`emulator -list-avds` output filtered through the shared AVD-name validator) + `EmulatorManager.start()` which spawns the boot via `spawnManaged`, tracks it in `ProcessRegistry`, keeps a bounded tail of the emulator's output, and reports the outcome on the `emulator:exit` event — so a boot failure like `PANIC: unknown AVD name` reaches the dashboard instead of dying in a hidden console.
 - `services/tools.ts` — system status probe, `flutter doctor -v`, `flutter devices`, `flutter pub get` (refuses folders without `pubspec.yaml`), VS Code open-folder.
+- `services/installer.ts` — automatic tool installation: on launch (and via the `tools:install` invoke / Install buttons) missing **adb** and **scrcpy** are fetched from fixed official HTTPS sources (Google platform-tools zip, the Genymobile scrcpy release feed), extracted with the system bsdtar through the no-shell runner, verified by executing the installed binary, then swapped into the per-user managed dir; **Flutter/VS Code** install on explicit user click through a fixed silent `winget` argv. Single-flight per tool, every transition streamed on `tools:install-progress` (`downloadFile`/`extractZip`/`pickScrcpyAsset` are injectable — unit-tested with fakes, and exercised for real by `tests/integration/live-install.test.ts`).
 - `services/exporter.ts` — the only writer of user-chosen files; path always comes from the native save dialog.
-- `services/updater.ts` — auto-update policy: packaged builds only, checks the GitHub Releases feed at launch and every 4 h, auto-downloads, streams `UpdateStatus` on `update:status`, and refuses to quit into the installer until a download has fully completed. `electron-updater`'s `autoUpdater` is injected as a structural interface (`UpdaterLike`), so the policy is unit-tested without Electron.
+- `services/updater.ts` — auto-update policy: packaged builds only, checks the GitHub Releases feed at launch and every 4 h, auto-downloads, streams `UpdateStatus` on `update:status`, and refuses to quit into the installer until a download has fully completed. Installing calls `quitAndInstall(true, true)` — **silent NSIS (`/S`) with an automatic relaunch**, so the user never sees a setup wizard. `electron-updater`'s `autoUpdater` is injected as a structural interface (`UpdaterLike`), so the policy is unit-tested without Electron.
 
 ## Renderer
 

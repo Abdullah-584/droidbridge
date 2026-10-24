@@ -260,6 +260,24 @@ export interface EmulatorStartResult {
 }
 
 // ---------------------------------------------------------------------------
+// Tool installation
+// ---------------------------------------------------------------------------
+
+/**
+ * Progress of an automatic tool install (`tools:install` invoke,
+ * `tools:install-progress` event). Zip tools report real download percent;
+ * winget installs stay in `installing` until they finish.
+ */
+export interface InstallProgress {
+  tool: ToolName;
+  phase: 'downloading' | 'extracting' | 'verifying' | 'installing' | 'done' | 'error';
+  /** 0–100; meaningful for `downloading`, 0 for the other phases. */
+  percent: number;
+  /** Human-readable detail (winget output tail, error message). */
+  message?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Updates
 // ---------------------------------------------------------------------------
 
@@ -305,6 +323,7 @@ export interface IpcInvokeMap {
   'scrcpy:stop': { args: { sessionId: string }; result: null };
   'emulator:list': { args: null; result: EmulatorListResult };
   'emulator:start': { args: { avd: string }; result: EmulatorStartResult };
+  'tools:install': { args: { tool: ToolName }; result: null };
   'update:install': { args: null; result: null };
 }
 
@@ -313,6 +332,7 @@ export interface IpcEventMap {
   'logcat:exit': { sessionId: string; code: number | null; error?: string };
   'scrcpy:exit': { sessionId: string; code: number | null; error?: string };
   'emulator:exit': { sessionId: string; avd: string; code: number | null; error?: string };
+  'tools:install-progress': InstallProgress;
   'update:status': UpdateStatus;
 }
 

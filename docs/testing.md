@@ -12,7 +12,8 @@ Runner: **Vitest** (`npm test`, config in `vitest.config.ts`). Layers follow the
 | `tests/main/adb-parse.test.ts` | Real `adb devices -l`, `getprop`, `dumpsys battery`, `df -k`, `/proc/meminfo`, `ip addr`, `logcat -v threadtime`, `flutter devices` output fixtures |
 | `tests/main/adb-locate.test.ts` | Tool location priority (override → SDK env → PATH → winget package scan → default locations) with injected file probes — adb, Flutter, scrcpy, VS Code and the emulator |
 | `tests/main/emulator.test.ts` | AVD list parsing (CRLF, noise, dedup, cap), start-argv construction, and the `EmulatorManager` lifecycle against fake children: registry tracking, exit reporting, spawn-error de-duplication, bounded failure output |
-| `tests/main/ipc-registry.test.ts` | Result envelope, error normalization, complete channel registration, per-channel payload validation |
+| `tests/main/ipc-registry.test.ts` | Result envelope, error normalization, complete channel registration, per-channel payload validation (incl. the closed `tools:install` enum) |
+| `tests/main/installer.test.ts` | Automatic tool installer with injected download/extract/run/locate seams: zip staging → verify-by-execution → swap into the managed dir, scrcpy release-asset selection, fixed winget argv, error surfacing + staging cleanup, single-flight, and the adb/scrcpy-only auto-install policy |
 
 ### 2. Process-safety tests (node, real processes)
 
@@ -31,6 +32,15 @@ Runner: **Vitest** (`npm test`, config in `vitest.config.ts`). Layers follow the
 - runs the real `flutter --version` when a Flutter SDK is present (skipped otherwise);
 - resolves scrcpy wherever it is installed (winget/PATH) and runs the real `scrcpy --version`, asserting the honest "not installed" result when absent.
 
+`tests/integration/live-install.test.ts` — the auto-installer against the real internet:
+
+- downloads the official platform-tools zip, extracts it with the system bsdtar and proves the installed `adb` runs (exit 0) inside a temp root that never touches the user's managed dir;
+- resolves the latest scrcpy GitHub release and installs a working `scrcpy` the same way.
+
+These run with `CI=true` (set automatically on GitHub Actions — every release gates on
+them) or locally via `DROIDBRIDGE_LIVE_INSTALL=1 npm test`; plain local `npm test` skips
+their network dependency.
+
 These are the tests that prove "real ADB only". They intentionally pass with zero devices attached — device-dependent UI states are covered by fixtures and component tests.
 
 ### 4. Renderer tests (jsdom)
@@ -40,6 +50,8 @@ These are the tests that prove "real ADB only". They intentionally pass with zer
 | `tests/renderer/format.test.ts` | Log filtering (level + regex/substring fallback, combined), state/level styling maps, duration/time formatting |
 | `tests/renderer/ui.test.tsx` | Primitives (Button/StatusPill/EmptyState/Field), Sidebar navigation, **PairingView validation UX** (invalid port / missing host never reach IPC) with a stubbed bridge |
 | `tests/renderer/emulator-launcher.test.tsx` | Dashboard **EmulatorLauncher**: single-AVD auto-start, AVD chooser, honest errors (emulator missing / no AVDs / start failure), `emulator:exit` handling (failed boot surfaces `PANIC`, clean exit returns to idle, foreign sessions ignored) |
+| `tests/renderer/install-button.test.tsx` | **InstallButton**: per-tool label, `tools:install` invoke, live percent from `tools:install-progress`, `done` → status refresh, rejected installs and auto-install failure events surfaced as alerts |
+| `tests/renderer/update-banner.test.tsx` | `useUpdate` + **UpdateBanner**: hidden when idle, streamed statuses, `update:install` invoke, install failures rendered honestly |
 
 ## Running
 
@@ -53,7 +65,7 @@ Notes:
 
 - `tests/mocks/electron.ts` is aliased over `electron` so main-process modules import cleanly in tests (vitest.config.ts `resolve.alias`).
 - Component tests opt into jsdom per file (`// @vitest-environment jsdom`) and must call `cleanup()` between renders (globals are disabled).
-- Live integration tests skip gracefully when `flutter`/`scrcpy` are absent.
+- Live integration tests skip gracefully when `flutter`/`scrcpy` are absent; the live install tests run when `CI=true` or `DROIDBRIDGE_LIVE_INSTALL=1`.
 
 ## What is deliberately not automated
 

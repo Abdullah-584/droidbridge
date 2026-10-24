@@ -4,7 +4,13 @@
 
 `.github/workflows/release.yml` builds the installer and publishes it to
 [GitHub Releases](https://github.com/Abdullah-584/droidbridge/releases)
-automatically. Two paths, same result:
+automatically. Three paths, same result:
+
+**0. Automatic (default)** — push any **code** change to `main` (`src/`, `scripts/`,
+`tests/`, package files, workflow config): the workflow bumps the patch version
+itself (e.g. `1.0.1 → 1.0.2`), commits it to `main`, then builds and publishes.
+README/docs-only pushes are filtered out by the workflow's `paths:` list and
+never burn a version.
 
 **1. One click** — GitHub → *Actions → Release → Run workflow*:
 the workflow bumps the patch version itself (e.g. `1.0.0 → 1.0.1`), commits it
@@ -17,18 +23,37 @@ npm version patch        # bumps package.json + lockfile, commits, tags v1.0.1
 git push --follow-tags   # the v* tag triggers the workflow
 ```
 
-Either way the workflow then:
+All paths then:
 
-1. Installs Android platform-tools on the runner (the live `adb` tests need a real `adb`);
-2. `npm ci` → `npm test` — the full suite is a hard gate, no release on red;
-3. `npm run dist -- --publish always` — typecheck, esbuild, Vite, NSIS build, then upload of
+1. A `decide` job decides whether this run should publish at all — it skips our
+   own `release vX.Y.Z` bump commits and pushes whose HEAD commit is already
+   tagged (the follow-tags flow lets the tag run own that version), so a
+   version is never released twice. Pushes made with the workflow's own
+   `GITHUB_TOKEN` (the in-run bump and electron-builder's tag push) never
+   re-trigger workflows at all — GitHub's recursion rule.
+2. Installs Android platform-tools on the runner (the live `adb` tests need a real `adb`);
+3. `npm ci` → `npm test` — the full suite is a hard gate, no release on red
+   (with `CI=true`, so the **live install tests** — real HTTPS download +
+   extraction of adb/scrcpy — run on every release too);
+4. `npm run dist -- --publish always` — typecheck, esbuild, Vite, NSIS build, then upload of
    `DroidBridge-Setup-<version>-x64.exe`, its `.blockmap` and **`latest.yml`** to the release
    for the `v<version>` tag (`releaseType: release`, so it is public immediately — installed
    clients ignore drafts);
-4. Uploads the installer as a workflow artifact too, for convenience.
+5. `node scripts/verify-release.mjs` — the **duplicate-release guard**: proves the tag has
+   exactly one release holding exe + blockmap + `latest.yml`, that `latest.yml`'s version and
+   byte size match the uploaded exe, and repairs a split-asset duplicate (copy missing assets,
+   delete the empty twin) when electron-builder's parallel uploads race each other — failing
+   the run loudly otherwise;
+6. Uploads the installer as a workflow artifact too, for convenience.
 
 No secrets to configure: the workflow uses the built-in `GITHUB_TOKEN`
 (`permissions: contents: write` is already set).
+
+The guard can also be run locally (read-only diagnosis, anonymous API):
+
+```bash
+node scripts/verify-release.mjs --check
+```
 
 ### Rules the updater depends on
 
@@ -44,8 +69,11 @@ No secrets to configure: the workflow uses the built-in `GITHUB_TOKEN`
 
 - Only **packaged** builds ever talk to the feed — `npm run dev` stays silent.
 - A check runs at launch and every **4 hours**; `autoDownload` is on.
-- When a download completes the renderer shows a banner: **Restart now** (quits into the
-  installer) or **Later** (the update still installs on quit — `autoInstallOnAppQuit`).
+- When a download completes the renderer shows a banner: **Restart now** applies the
+  update **silently in the background** — the NSIS installer runs with `/S` (no setup
+  wizard, no user input) and the new version reopens itself — or **Later** (the update
+  still installs silently on quit — `autoInstallOnAppQuit`). The user never runs the
+  setup again by hand.
 - Failures surface honestly: the status stream carries `{ state: 'error' }`, and a failed
   restart attempt renders its message in the banner instead of failing silently.
 - The feed URL is `app-update.yml`, embedded by electron-builder from the `publish` block —
@@ -123,5 +151,7 @@ Never commit certificates or passwords. When a certificate is added, drop
 ## CI notes
 
 The real pipeline lives in `.github/workflows/release.yml` (windows-latest, Node 24,
-platform-tools installed for the live tests). Push to `main` does **not** publish — only a
-`v*` tag or a manual dispatch does.
+platform-tools installed for the live tests). Push to `main` publishes **only when code
+paths changed** (see the `paths:` filter); docs/README edits, our own bump commits and
+already-tagged commits are skipped by the `decide` job. Only a `v*` tag or a manual
+dispatch bypasses nothing — they always release.

@@ -64,6 +64,10 @@ describe('registerInvokeHandlers', () => {
       openExternal: () => undefined,
       pickFolder: async () => null,
       installUpdate: () => undefined,
+      installer: {
+        install: async () => undefined,
+        autoInstallMissing: async () => undefined,
+      },
     };
     registerInvokeHandlers(ipc, createHandlerSpecs(fakeDeps));
     expect(new Set(registered)).toEqual(new Set(INVOKE_CHANNELS));
@@ -82,6 +86,10 @@ describe('createHandlerSpecs validation', () => {
     openExternal: () => undefined,
     pickFolder: async () => null,
     installUpdate: () => undefined,
+    installer: {
+      install: async () => undefined,
+      autoInstallMissing: async () => undefined,
+    },
   };
   const specs = createHandlerSpecs(fakeDeps);
 
@@ -134,5 +142,16 @@ describe('createHandlerSpecs validation', () => {
     expect(() => specs['emulator:start'].validate({ avd: '' })).toThrow(ValidationError);
     expect(() => specs['emulator:start'].validate({})).toThrow(ValidationError);
     expect(() => specs['emulator:start'].validate({ avd: 42 })).toThrow(ValidationError);
+  });
+
+  it('accepts only known tool names for installation', () => {
+    expect(specs['tools:install'].validate({ tool: 'scrcpy' })).toEqual({ tool: 'scrcpy' });
+    expect(specs['tools:install'].validate({ tool: 'adb' })).toEqual({ tool: 'adb' });
+    // Closed enum — never a path, URL fragment or other free-form input.
+    expect(() => specs['tools:install'].validate({ tool: 'rm -rf' })).toThrow(ValidationError);
+    expect(() => specs['tools:install'].validate({ tool: '../../evil' })).toThrow(ValidationError);
+    expect(() => specs['tools:install'].validate({ tool: '' })).toThrow(ValidationError);
+    expect(() => specs['tools:install'].validate({ tool: 42 })).toThrow(ValidationError);
+    expect(() => specs['tools:install'].validate({})).toThrow(ValidationError);
   });
 });

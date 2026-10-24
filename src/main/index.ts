@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import { LogcatManager } from './adb/logcat';
+import { createToolInstaller, type ToolInstaller } from './services/installer';
 import { EmulatorManager } from './services/emulator';
 import { ScrcpyManager } from './services/scrcpy';
 import { createUpdater, type UpdaterHandle } from './services/updater';
@@ -31,6 +32,7 @@ installSecurity();
 
 let mainWindow: BrowserWindow | null = null;
 let updaterHandle: UpdaterHandle | null = null;
+let toolInstaller: ToolInstaller | null = null;
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -102,6 +104,13 @@ function registerIpc(): UpdaterHandle {
     },
   });
 
+  // Automatic tool installation: missing adb/scrcpy are fetched into
+  // %LOCALAPPDATA%\DroidBridge\tools (installer service); progress streams to
+  // the renderer on `tools:install-progress`.
+  toolInstaller = createToolInstaller((progress) =>
+    mainWindow?.webContents.send('tools:install-progress', progress),
+  );
+
   // Auto-update: packaged builds only (see services/updater), statuses stream
   // to the renderer on the `update:status` event channel.
   const updater = createUpdater(autoUpdater, {
@@ -113,6 +122,7 @@ function registerIpc(): UpdaterHandle {
     logcat,
     scrcpy,
     emulator,
+    installer: toolInstaller,
     installUpdate: () => updater.install(),
     appVersion: app.getVersion(),
     platform: process.platform,
@@ -138,6 +148,8 @@ app.whenReady().then(() => {
   updaterHandle = registerIpc();
   mainWindow = createWindow();
   updaterHandle.start();
+  // First-launch dependency pass: silently install adb/scrcpy when missing.
+  void toolInstaller?.autoInstallMissing();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AdbDevice, CommandResult, SystemStatus } from '../../shared/types';
 import type { useSystemStatus } from '../hooks/useSystemStatus';
 import { Button, Card, EmptyState, Field, StatusPill, inputClass } from '../components/ui';
+import { InstallButton } from '../components/InstallButton';
 import { IconExternal, IconFolder, IconPlay, IconStop } from '../components/icons';
 import { call } from '../lib/api';
 
@@ -98,10 +99,15 @@ export function ToolsView({ system, devices }: Props) {
         title="Flutter"
         description="SDK detection, doctor, devices and pub get"
         actions={
-          <StatusPill
-            tone={status?.flutter.available ? 'ok' : 'warn'}
-            label={status?.flutter.available ? 'SDK found' : 'Not installed'}
-          />
+          <div className="flex items-center gap-2">
+            <StatusPill
+              tone={status?.flutter.available ? 'ok' : 'warn'}
+              label={status?.flutter.available ? 'SDK found' : 'Not installed'}
+            />
+            {!status?.flutter.available && (
+              <InstallButton tool="flutter" onInstalled={() => void system.refresh()} />
+            )}
+          </div>
         }
       >
         <p className="font-mono text-[11px] text-muted">{status?.flutter.version ?? status?.flutter.hint ?? 'Probing…'}</p>
@@ -189,13 +195,20 @@ export function ToolsView({ system, devices }: Props) {
       </Card>
 
       <div className="space-y-5">
-        <Card
-          title="VS Code"
-          description="Open projects in VS Code without touching their files"
-          actions={
-            <StatusPill tone={status?.vscode.available ? 'ok' : 'warn'} label={status?.vscode.available ? 'CLI found' : 'Not installed'} />
-          }
-        >
+        <Card            title="VS Code"
+            description="Open projects in VS Code without touching their files"
+            actions={
+              <div className="flex items-center gap-2">
+                <StatusPill
+                  tone={status?.vscode.available ? 'ok' : 'warn'}
+                  label={status?.vscode.available ? 'CLI found' : 'Not installed'}
+                />
+                {!status?.vscode.available && (
+                  <InstallButton tool="code" label="VS Code" onInstalled={() => void system.refresh()} />
+                )}
+              </div>
+            }
+          >
           <p className="font-mono text-[11px] text-muted">{status?.vscode.version ?? status?.vscode.hint ?? 'Probing…'}</p>
 
           <div className="mt-4 flex flex-wrap items-end gap-2">
@@ -240,11 +253,14 @@ export function ToolsView({ system, devices }: Props) {
           }
         >
           {!status?.scrcpy.available ? (
-            <EmptyState
-              icon={<IconExternal size={24} />}
-              title="scrcpy is not installed"
-              hint="Install it with: winget install Genymobile.scrcpy — then refresh. scrcpy is an open-source screen mirroring tool by Genymobile."
-            />
+            <div className="flex flex-col items-center gap-4">
+              <EmptyState
+                icon={<IconExternal size={24} />}
+                title="scrcpy is not installed"
+                hint="DroidBridge can install it for you from the official Genymobile release — or run: winget install Genymobile.scrcpy"
+              />
+              <InstallButton tool="scrcpy" onInstalled={() => void system.refresh()} />
+            </div>
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2">

@@ -6,7 +6,9 @@ import {
   findFlutter,
   findScrcpy,
   findVSCode,
+  findWingetFlutter,
   findWingetScrcpy,
+  managedToolsRoot,
   parseRegQueryValue,
   whichSync,
   type FileProbe,
@@ -239,6 +241,95 @@ describe('winget package scan (scrcpy)', () => {
 function probeOf(...files: string[]): FileProbe {
   return probeFor(files.filter(Boolean));
 }
+
+describe('managed tools dir (DroidBridge auto-install)', () => {
+  const SCRCPY = process.platform === 'win32' ? 'scrcpy.exe' : 'scrcpy';
+  const localAppData = `C${sep}lad`;
+  const managed = path.join(localAppData, 'DroidBridge', 'tools');
+
+  it('exposes the managed root only when LOCALAPPDATA exists', () => {
+    expect(managedToolsRoot({ LOCALAPPDATA: localAppData })).toBe(managed);
+    expect(managedToolsRoot({})).toBeNull();
+  });
+
+  it('finds an auto-installed adb when nothing else exists', () => {
+    const env = { PATH: `C${sep}empty`, LOCALAPPDATA: localAppData };
+    const managedAdb = path.join(managed, 'platform-tools', ADB);
+    expect(findAdb(env, probeOf(managedAdb), noReg)).toEqual({ path: managedAdb, source: 'default-location' });
+  });
+
+  it('prefers a PATH adb over the managed install', () => {
+    const env = { PATH: `C${sep}pathbin`, LOCALAPPDATA: localAppData };
+    const managedAdb = path.join(managed, 'platform-tools', ADB);
+    const probe = probeOf(managedAdb, `${env.PATH}${sep}${ADB}`);
+    expect(findAdb(env, probe, noReg)).toEqual({ path: `${env.PATH}${sep}${ADB}`, source: 'path' });
+  });
+
+  it('finds an auto-installed scrcpy before the winget scan', () => {
+    const env = { PATH: '', LOCALAPPDATA: localAppData };
+    const managedScrcpy = path.join(managed, 'scrcpy', SCRCPY);
+    const wingetScrcpy = path.join(
+      localAppData,
+      'Microsoft',
+      'WinGet',
+      'Packages',
+      'Genymobile.scrcpy_abc',
+      'scrcpy-win64-v3.3.3',
+      SCRCPY,
+    );
+    const probe = probeOf(managedScrcpy, wingetScrcpy);
+    expect(findScrcpy(env, probe)).toEqual({ path: managedScrcpy, source: 'default-location' });
+  });
+});
+
+describe('findWingetFlutter', () => {
+  const localAppData = `C${sep}lad`;
+  const links = path.join(localAppData, 'Microsoft', 'WinGet', 'Links', 'flutter.bat');
+  const payload = path.join(
+    localAppData,
+    'Microsoft',
+    'WinGet',
+    'Packages',
+    'Google.Flutter_1a2b3c',
+    'flutter',
+    'bin',
+    'flutter.bat',
+  );
+
+  function probeWith(files: string[], dirs: Record<string, string[]>): FileProbe {
+    const set = new Set(files.map((f) => f.toLowerCase()));
+    const dirMap = new Map(Object.entries(dirs).map(([k, v]) => [k.toLowerCase(), v]));
+    return {
+      isFile: (p) => set.has(p.toLowerCase()),
+      listDir: (p) => {
+        const entries = dirMap.get(p.toLowerCase());
+        if (!entries) throw new Error('ENOENT');
+        return entries;
+      },
+    };
+  }
+
+  it('finds the WinGet Links shim first', () => {
+    const probe = probeWith([links], {
+      [path.join(localAppData, 'Microsoft', 'WinGet', 'Packages')]: ['Google.Flutter_1a2b3c'],
+    });
+    expect(findWingetFlutter(localAppData, probe)).toBe(links);
+  });
+
+  it('finds the extracted package payload when there is no shim', () => {
+    const packagesDir = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages');
+    const probe = probeWith([payload], {
+      [packagesDir]: ['Google.Flutter_1a2b3c'],
+      [path.join(packagesDir, 'Google.Flutter_1a2b3c')]: ['flutter'],
+    });
+    expect(findWingetFlutter(localAppData, probe)).toBe(payload);
+  });
+
+  it('returns null without WinGet data or LOCALAPPDATA', () => {
+    expect(findWingetFlutter(localAppData, probeOf())).toBeNull();
+    expect(findWingetFlutter(undefined, probeOf())).toBeNull();
+  });
+});
 
 describe('findEmulator', () => {
   /** Platform-correct emulator binary name (Windows CI and macOS CI both run these). */

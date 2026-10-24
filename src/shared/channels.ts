@@ -30,10 +30,18 @@ export const INVOKE_CHANNELS = [
   'scrcpy:stop',
   'emulator:list',
   'emulator:start',
+  'tools:install',
   'update:install',
 ] as const;
 
-export const EVENT_CHANNELS = ['logcat:lines', 'logcat:exit', 'scrcpy:exit', 'emulator:exit', 'update:status'] as const;
+export const EVENT_CHANNELS = [
+  'logcat:lines',
+  'logcat:exit',
+  'scrcpy:exit',
+  'emulator:exit',
+  'tools:install-progress',
+  'update:status',
+] as const;
 
 /** Prefix used by the preload bridge for its typed API namespace. */
 export const PRELOAD_BRIDGE_NAME = 'droidbridge';

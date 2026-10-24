@@ -47,7 +47,8 @@ export function UpdateBanner({ status, installError, onInstall, onDismiss }: Upd
     return (
       <div role="status" aria-live="polite" className={`${BAR} ${TONE.ready}`}>
         <span className="min-w-0">
-          Update v{status.version} is ready — restart to finish installing.
+          Update v{status.version} is ready — restart installs it silently in the
+          background (no setup wizard) and reopens DroidBridge.
           {installError && <span className="ml-2 text-rose-300">{installError}</span>}
         </span>
         <span className="flex shrink-0 items-center gap-2">
