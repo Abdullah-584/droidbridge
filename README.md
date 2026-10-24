@@ -19,6 +19,41 @@ Everything you see is real: DroidBridge shells out to the actual `adb`, `flutter
 | **scrcpy** | Optional mirroring with fps/bitrate/audio/on-top/fullscreen options, launch & stop managed by DroidBridge |
 | **Auto-updates** | Installed builds check GitHub Releases at launch and every 4 h, download in the background, then **Restart now** (or install on quit) |
 
+## Screenshots
+
+Real captures from the running app, taken against an Android 16 emulator — regenerate with
+`node scripts/capture-screenshots.mjs` (needs the app running with a CDP port and a device or
+emulator attached).
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/dashboard.png" alt="Dashboard — connected devices, toolchain health, emulator launcher" /><br />
+      <sub><b>Dashboard</b> — live devices, toolchain health, emulator launcher, quick actions</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/devices.png" alt="Devices — inspector with identity, live state and diagnostics" /><br />
+      <sub><b>Devices</b> — identity, live state and one-click diagnostics with pass/fail checks</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/logcat.png" alt="Logcat — live streaming device logs" /><br />
+      <sub><b>Logcat</b> — live streaming with buffers, levels, search, pause and export</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/pairing.png" alt="Pairing — USB authorization and wireless pairing" /><br />
+      <sub><b>Pairing</b> — guided USB authorization and wireless pairing flows</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="docs/screenshots/tools.png" alt="Tools — Flutter, VS Code and scrcpy status" /><br />
+      <sub><b>Tools</b> — real <code>flutter doctor</code> output, VS Code integration and scrcpy mirroring options</sub>
+    </td>
+  </tr>
+</table>
+
 ## Requirements
 
 - Windows 10/11 x64
