@@ -1,7 +1,7 @@
 {
   "name": "droidbridge",
   "productName": "DroidBridge",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Windows developer dashboard for Android devices over USB and wireless ADB",
   "license": "MIT",
   "private": true,
