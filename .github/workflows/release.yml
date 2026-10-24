@@ -37,7 +37,7 @@ on:
 
 # Creating/uploading a release needs write access for the default token.
 permissions:
-contents: write
+  contents: write
 
 # One release at a time; never cancel a half-uploaded release. This also
 # serializes queued runs, so post-publish checks see a settled state.
