@@ -81,4 +81,4 @@ Views are plain function components over `components/ui.tsx` primitives (`Button
 - `scripts/dev.mjs` — orchestrates esbuild watch + Vite dev server + Electron with `DROIDBRIDGE_DEV_SERVER_URL`; waits for the dev server before launching.
 - `vite build` → `dist/renderer` (`base: './'` so `loadFile` works).
 - `electron-builder` → NSIS x64 installer (`electron-builder.yml`), shipping `dist/**` + `package.json` + the production `node_modules` (just `electron-updater`) inside an asar.
-- `publish: github` in `electron-builder.yml` embeds `app-update.yml` (the update feed: `Abdullah-584/droidbridge`, `releaseType: release`) and, when CI runs with `--publish always`, uploads the installer + blockmap + `latest.yml` as the GitHub Release for the tag. See `docs/releasing.md`.
+- `publish: github` in `electron-builder.yml` embeds `app-update.yml` (the update feed: `Abdullah-584/droidbridge`, `releaseType: release`). CI builds with `--publish never` and publishes the installer + blockmap + `latest.yml` itself via a retryable `gh release` loop (electron-builder's own publisher cannot resume a half-uploaded release). See `docs/releasing.md`.

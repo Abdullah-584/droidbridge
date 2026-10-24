@@ -29,20 +29,24 @@ All paths then:
    own `release vX.Y.Z` bump commits and pushes whose HEAD commit is already
    tagged (the follow-tags flow lets the tag run own that version), so a
    version is never released twice. Pushes made with the workflow's own
-   `GITHUB_TOKEN` (the in-run bump and electron-builder's tag push) never
+   `GITHUB_TOKEN` (the in-run bump and the gh-created release tag) never
    re-trigger workflows at all — GitHub's recursion rule.
 2. Installs Android platform-tools on the runner (the live `adb` tests need a real `adb`);
 3. `npm ci` → `npm test` — the full suite is a hard gate, no release on red
    (with `CI=true`, so the **live install tests** — real HTTPS download +
    extraction of adb/scrcpy — run on every release too);
-4. `npm run dist -- --publish always` — typecheck, esbuild, Vite, NSIS build, then upload of
-   `DroidBridge-Setup-<version>-x64.exe`, its `.blockmap` and **`latest.yml`** to the release
-   for the `v<version>` tag (`releaseType: release`, so it is public immediately — installed
-   clients ignore drafts);
+4. `npm run dist -- --publish never` — typecheck, esbuild, Vite, NSIS build; nothing is
+   uploaded yet. Publishing is a separate step: `gh release create` (tag lands on the pushed
+   commit, `releaseType: release` — public immediately, since installed clients ignore drafts)
+   followed by `gh release upload` of `DroidBridge-Setup-<version>-x64.exe`, its `.blockmap`
+   and **`latest.yml`**, wrapped in a 3-attempt retry loop with `--clobber`. electron-builder's
+   built-in publisher was abandoned here because it cannot retry or resume: one flaky
+   asset-upload (GitHub's release-asset API 502s under load — seen on v1.0.1 and v1.0.2)
+   left a half-published release that a rerun could not repair;
 5. `node scripts/verify-release.mjs` — the **duplicate-release guard**: proves the tag has
    exactly one release holding exe + blockmap + `latest.yml`, that `latest.yml`'s version and
    byte size match the uploaded exe, and repairs a split-asset duplicate (copy missing assets,
-   delete the empty twin) when electron-builder's parallel uploads race each other — failing
+   delete the empty twin) if a publish ever leaves one — failing
    the run loudly otherwise;
 6. Uploads the installer as a workflow artifact too, for convenience.
 
@@ -113,7 +117,7 @@ npm run dist:dir && npx electron release/win-unpacked/DroidBridge.exe
 
 - **Target**: NSIS, x64 only, per-user install (no admin), install dir choosable, Start Menu + Desktop shortcuts, app data preserved on uninstall.
 - **Payload**: `dist/main/**`, `dist/preload/**`, `dist/renderer/**`, `package.json` and the production `node_modules` (only `electron-updater`) inside an asar — no source, no source maps, no dev dependencies.
-- **Publish**: `provider: github`, `owner: Abdullah-584`, `repo: droidbridge`, `releaseType: release` — generates `app-update.yml` in the package and is the target for `--publish always`.
+- **Publish**: `provider: github`, `owner: Abdullah-584`, `repo: droidbridge`, `releaseType: release` — generates `app-update.yml` in the package (the update feed the app polls). CI builds with `--publish never` and publishes the assets itself via the retryable `gh` CLI — see the workflow and step 4 above.
 - **`win.verifyUpdateCodeSignature: false`**: the build ships unsigned (no certificate), and electron-updater would otherwise reject an unsigned installer during update verification.
 - **Icon**: `build/icon.png` (256×256, regenerated with `node scripts/make-icon.mjs`); electron-builder derives the `.ico` automatically.
 

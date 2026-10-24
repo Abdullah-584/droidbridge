@@ -10,8 +10,14 @@ name: Release
 # GitHub Releases with the update manifest (latest.yml + blockmap) that
 # installed clients poll for, then verify the published release is complete.
 #
+# Publishing uses the gh CLI, not electron-builder's built-in publisher: that
+# publisher has no retry and no resume, so one flaky asset upload (GitHub's
+# release-asset API 502s under load — seen on v1.0.1 and v1.0.2) left partial
+# releases a rerun could not repair. Building with --publish never and
+# uploading with a retryable, clobbering gh loop makes every publish re-runnable.
+#
 # Note: pushes made with the built-in GITHUB_TOKEN (the in-run version bump and
-# electron-builder's tag push) never re-trigger workflows — GitHub's platform
+# the gh-created release tag) never re-trigger workflows — GitHub's platform
 # rule against recursion. The `decide` job additionally guards the human
 # follow-tags flow so a branch run and its tag run never both publish.
 on:
@@ -127,20 +133,61 @@ jobs:
           CI: 'true'
 
       # `dist` = typecheck + esbuild main/preload + Vite renderer + NSIS build.
-      # --publish always uploads installer, blockmap and latest.yml to the
-      # GitHub release for this tag (releaseType: release, not draft).
-      - name: Build and publish to GitHub Releases
-        run: npm run dist -- --publish always
+      # --publish never: the release itself is created by the next step, which
+      # can retry and resume where electron-builder's publisher could not.
+      - name: Build installers (no publish)
+        run: npm run dist -- --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No signing certificate on CI: skip certificate discovery.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      # electron-builder's parallel asset uploads can race the "release
-      # exists" check and split assets across two release objects (seen on
-      # v1.0.1). This step proves the release is single, complete and
-      # self-consistent — repairing a split duplicate when possible and
-      # failing the run loudly when not.
+      # Create the release (tag lands on this commit) and upload installer +
+      # blockmap + latest.yml. --clobber makes a re-run idempotent, and the
+      # loop absorbs transient asset-upload failures instead of leaving a
+      # half-published release behind.
+      - name: Publish to GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v$(node -p "require('./package.json').version")"
+          shopt -s nullglob
+          assets=(release/*.exe release/*.exe.blockmap release/latest.yml)
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::no built assets found in release/"
+            exit 1
+          fi
+          echo "Publishing ${tag}: ${assets[*]}"
+          for attempt in 1 2 3; do
+            ok=false
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              if gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"; then
+                ok=true
+              fi
+            else
+              if gh release create "$tag" "${assets[@]}" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --target "$GITHUB_SHA" \
+                  --title "$tag" \
+                  --generate-notes; then
+                ok=true
+              fi
+            fi
+            if [ "$ok" = true ]; then
+              echo "Published ${tag}."
+              exit 0
+            fi
+            echo "Publish attempt ${attempt} failed — retrying in 15s."
+            sleep 15
+          done
+          echo "::error::failed to publish ${tag} after 3 attempts"
+          exit 1
+
+      # The guard proves the published state instead of trusting the previous
+      # step: exactly one release for this tag (repairing split duplicates
+      # when possible), exe + blockmap + latest.yml present, and latest.yml's
+      # version and byte size matching the uploaded exe.
       - name: Verify published release (duplicate guard)
         shell: bash
         env:
